@@ -42,7 +42,7 @@ function App() {
           {/* 1. 승패 메시지 (가장 상단에 배치) */}
           <div className={`winner-banner ${gameData.winner}`}>
             {gameData.winner === 'player' && "🏆 YOU WIN! 🏆"}
-            {gameData.winner === 'dealer' && "💀 DEALER WINS 💀"}
+            {gameData.winner === 'dealer' && "💀 DEALER WIN! 💀"}
             {gameData.winner === 'draw' && "🤝 DRAW 🤝"}
           </div>
 
