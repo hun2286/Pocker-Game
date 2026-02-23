@@ -11,9 +11,11 @@
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
@@ -22,6 +24,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -39,4 +42,62 @@
 
 .read-the-docs {
   color: #888;
+}
+
+.poker-app {
+  background-color: #1a472a;
+  min-height: 100vh;
+  color: white;
+  padding: 40px;
+  text-align: center;
+}
+
+.card-row {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.card {
+  width: 80px;
+  height: 120px;
+  background: white;
+  border-radius: 10px;
+  color: black;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  font-weight: bold;
+  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.red {
+  color: #d63031;
+}
+
+.black {
+  color: #2d3436;
+}
+
+.deal-button {
+  padding: 15px 30px;
+  font-size: 20px;
+  cursor: pointer;
+  background-color: #f39c12;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  transition: transform 0.1s;
+}
+
+.deal-button:active {
+  transform: scale(0.95);
+}
+
+.highlight {
+  color: #f1c40f;
+  font-size: 32px;
 }
