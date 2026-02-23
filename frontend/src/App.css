@@ -142,3 +142,54 @@
     transform: translateY(-10px);
   }
 }
+
+/* 승자 안내 배너 */
+.winner-banner {
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin: 20px 0;
+  padding: 15px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.winner-banner.player {
+  color: #f1c40f;
+  background: rgba(241, 196, 15, 0.1);
+}
+
+.winner-banner.dealer {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+}
+
+.winner-banner.draw {
+  color: #ecf0f1;
+  background: rgba(236, 240, 241, 0.1);
+}
+
+/* 승자 테두리 강조 */
+.winner-border {
+  border: 2px solid #f1c40f;
+  box-shadow: 0 0 20px rgba(241, 196, 15, 0.3);
+  transform: scale(1.02);
+  transition: all 0.3s ease;
+}
+
+/* 구분선 텍스트 */
+.divider {
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.9rem;
+  margin: 20px 0;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 15px;
+}
