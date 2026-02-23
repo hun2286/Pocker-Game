@@ -91,17 +91,42 @@ def evaluate_hand(cards):
     return "하이카드 (High Card)"
 
 
+# @app.get("/deal")
+# def deal_cards():
+#     deck = create_deck()
+#     random.shuffle(deck)
+
+#     player_hand = [deck.pop(), deck.pop()]
+#     community_cards = [deck.pop() for _ in range(5)]
+#     best_hand = evaluate_hand(player_hand + community_cards)
+
+#     return {
+#         "player_hand": player_hand,
+#         "community_cards": community_cards,
+#         "best_hand": best_hand,
+#     }
+
+
 @app.get("/deal")
 def deal_cards():
     deck = create_deck()
     random.shuffle(deck)
 
+    # 각각 2장씩 배분
     player_hand = [deck.pop(), deck.pop()]
+    dealer_hand = [deck.pop(), deck.pop()]
     community_cards = [deck.pop() for _ in range(5)]
-    best_hand = evaluate_hand(player_hand + community_cards)
+
+    # 플레이어와 딜러의 족보 계산
+    player_best = evaluate_hand(player_hand + community_cards)
+    dealer_best = evaluate_hand(dealer_hand + community_cards)
+
+    # (심화) 누가 이겼는지 간단히 판정하는 로직을 추가할 수 있습니다.
 
     return {
         "player_hand": player_hand,
+        "dealer_hand": dealer_hand,  # 딜러 패 추가
         "community_cards": community_cards,
-        "best_hand": best_hand,
+        "player_best": player_best,
+        "dealer_best": dealer_best,
     }
