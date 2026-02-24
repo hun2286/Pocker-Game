@@ -7,22 +7,20 @@ function App() {
   const [phase, setPhase] = useState("waiting");
   const [loading, setLoading] = useState(false);
 
-  // 1. 카드 렌더링 함수 (하이라이트 파라미터 추가)
+  // [추가] 특정 카드가 족보 구성 카드 리스트에 포함되는지 확인하는 함수
+  const isCardInBestHand = (card, bestCards) => {
+    if (!card || !bestCards) return false;
+    return bestCards.some(bc => bc.rank === card.rank && bc.suit === card.suit);
+  };
+
   const renderCard = (card, index, isCommunity = false, isHighlight = false) => {
     if (!card) return null;
     const isRed = ['♥', '♦'].includes(card.suit);
-
-    let delay = 0;
-    if (isCommunity) {
-      delay = index < 3 ? index * 0.1 : 0.05;
-    } else {
-      delay = index * 0.1;
-    }
+    let delay = isCommunity ? (index < 3 ? index * 0.1 : 0.05) : index * 0.1;
 
     return (
       <div
         key={`${card.rank}${card.suit}`}
-        // isHighlight가 true이면 'highlight' 클래스가 추가됩니다.
         className={`card ${isRed ? 'red' : 'black'} ${isHighlight ? 'highlight' : ''}`}
         style={{ animationDelay: `${delay}s` }}
       >
@@ -32,7 +30,6 @@ function App() {
     );
   };
 
-  // 2. 게임 진행 함수
   const handleGameAction = async () => {
     setLoading(true);
     const url = phase === "waiting" || phase === "showdown"
@@ -54,10 +51,8 @@ function App() {
   return (
     <div className="poker-app">
       <h1>Texas Hold'em Table</h1>
-
       <button className="deal-button" onClick={handleGameAction} disabled={loading}>
-        {loading ? "..." :
-          phase === "waiting" || phase === "showdown" ? "New Game" : "Next Card"}
+        {loading ? "..." : phase === "waiting" || phase === "showdown" ? "New Game" : "Next Card"}
       </button>
 
       <div className="game-board">
@@ -66,15 +61,16 @@ function App() {
           <h2>Dealer Hand</h2>
           <div className="card-row">
             {phase === "showdown" && gameData?.dealer_hand ?
-              // 딜러가 이겼을 때만 카드를 하이라이트 처리
-              gameData.dealer_hand.map((card, i) => renderCard(card, i, false, gameData?.winner === 'dealer')) :
-              <>
-                <div className="card-placeholder" style={{ animationDelay: '0s' }}></div>
-                <div className="card-placeholder" style={{ animationDelay: '0.1s' }}></div>
-              </>
-            }
+              gameData.dealer_hand.map((card, i) =>
+                // 수정: 딜러 카드 중 족보 구성에 포함된 카드만 하이라이트
+                renderCard(card, i, false, isCardInBestHand(card, gameData?.dealer_best_cards))
+              ) : (
+                <>
+                  <div className="card-placeholder" style={{ animationDelay: '0s' }}></div>
+                  <div className="card-placeholder" style={{ animationDelay: '0.1s' }}></div>
+                </>
+              )}
           </div>
-          {/* 딜러가 이기면 글자도 번쩍이게 active 클래스 추가 */}
           <div className={`hand-name ${phase === "showdown" && gameData?.winner === 'dealer' ? 'active' : ''}`}>
             {phase === "showdown" && gameData?.dealer_best}
           </div>
@@ -85,8 +81,11 @@ function App() {
         {/* 2. 공통 카드 섹션 */}
         <div className="section community-section">
           <div className="card-row">
-            {/* 공통 카드는 쇼다운 시 모두 하이라이트 효과를 받도록 설정 (혹은 승자 조건에 따라 조절 가능) */}
-            {gameData?.community_cards?.map((card, i) => renderCard(card, i, true, phase === "showdown"))}
+            {gameData?.community_cards?.map((card, i) => {
+              // 수정: 현재 승자의 족보 구성 리스트를 가져와서 비교
+              const bestCards = gameData.winner === 'player' ? gameData.player_best_cards : gameData.dealer_best_cards;
+              return renderCard(card, i, true, phase === "showdown" && isCardInBestHand(card, bestCards));
+            })}
           </div>
         </div>
 
@@ -96,10 +95,11 @@ function App() {
         <div className={`section player-section ${phase === 'showdown' && gameData?.winner === 'player' ? 'winner-border' : ''}`}>
           <h2>Your Hand</h2>
           <div className="card-row">
-            {/* 플레이어가 이겼을 때만 카드를 하이라이트 처리 */}
-            {gameData?.player_hand?.map((card, i) => renderCard(card, i, false, phase === "showdown" && gameData?.winner === 'player'))}
+            {gameData?.player_hand?.map((card, i) =>
+              // 수정: 내 카드 중 족보 구성에 포함된 카드만 하이라이트
+              renderCard(card, i, false, isCardInBestHand(card, gameData?.player_best_cards))
+            )}
           </div>
-          {/* 플레이어가 이기면 글자도 번쩍이게 active 클래스 추가 */}
           <div className={`hand-name ${phase === "showdown" && gameData?.winner === 'player' ? 'active' : ''}`}>
             {gameData?.player_best && `Your Best: ${gameData.player_best}`}
           </div>
