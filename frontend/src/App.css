@@ -1,77 +1,108 @@
+/* 1. 기본 배경 및 레이아웃 */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #1a472a;
+  color: white;
+  font-family: 'Arial', sans-serif;
+  overflow: hidden;
+}
+
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .poker-app {
-  background-color: #1a472a;
-  min-height: 100vh;
+  width: 95%;
+  max-width: 800px;
+  height: 98vh;
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+h1 {
+  font-size: 1.1rem;
+  margin: 5px 0;
+  height: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f1c40f;
+}
+
+/* 2. 버튼 높이 최적화 */
+.deal-button {
+  padding: 8px 20px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  background-color: #f39c12;
   color: white;
-  padding: 40px;
-  text-align: center;
+  border: none;
+  border-radius: 20px;
+  margin: 5px auto;
+  height: 35px;
+  display: block;
+}
+
+/* 3. 게임 보드 - 높이 짤림 방지 핵심 */
+.game-board {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: flex-start;
+}
+
+/* 4. 섹션 높이 압축 */
+.section {
+  padding: 20px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+h2 {
+  font-size: 0.9rem;
+  margin: 0 0 5px 0;
+  opacity: 0.8;
 }
 
 .card-row {
   display: flex;
   justify-content: center;
-  gap: 15px;
-  margin: 20px 0;
+  gap: 8px;
+  height: 85px;
+  align-items: center;
 }
 
+/* 5. 카드 크기 고정 */
 .card {
-  width: 80px;
-  height: 120px;
+  width: 55px;
+  height: 80px;
   background: white;
-  border-radius: 10px;
+  border-radius: 6px;
   color: black;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: bold;
-  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+  /* --- 추가된 애니메이션 속성 --- */
+  animation: card-fall 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  opacity: 0;
+  backface-visibility: hidden;
 }
 
 .red {
@@ -82,107 +113,52 @@
   color: #2d3436;
 }
 
-.deal-button {
-  padding: 15px 30px;
-  font-size: 20px;
-  cursor: pointer;
-  background-color: #f39c12;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  transition: transform 0.1s;
+/* 6. 트럼프 뒷면 디자인 (사선 패턴) */
+.card-placeholder {
+  width: 55px;
+  height: 80px;
+  background-color: #2c3e50;
+  background-image:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.1) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.1) 75%);
+  background-size: 10px 10px;
+  border: 2px solid white;
+  border-radius: 6px;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+  /* --- 추가된 애니메이션 속성 --- */
+  animation: card-fall 0.5s ease-out forwards;
 }
 
-.deal-button:active {
-  transform: scale(0.95);
-}
-
-.highlight {
-  color: #f1c40f;
-  font-size: 32px;
-}
-
-/* 구분선 스타일 */
-.divider {
-  height: 2px;
-  background: rgba(255, 255, 255, 0.1);
-  margin: 30px auto;
-  width: 100%;
-}
-
-/* 결과 텍스트 */
-.hand-result {
-  font-size: 1.2rem;
-  margin-top: 10px;
-  color: #ecf0f1;
-}
-
-.hand-result strong {
-  color: #f1c40f;
-  text-decoration: underline;
-}
-
-/* 승자 강조 애니메이션 */
-.winner-announcement {
-  font-size: 2.5rem;
-  color: #f1c40f;
-  text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
-  margin-top: 30px;
-  animation: bounce 1s infinite;
-}
-
-@keyframes bounce {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-/* 승자 안내 배너 */
-.winner-banner {
-  font-size: 2.5rem;
-  font-weight: bold;
-  margin: 20px 0;
-  padding: 15px;
-  border-radius: 10px;
-  text-align: center;
-}
-
-.winner-banner.player {
-  color: #f1c40f;
-  background: rgba(241, 196, 15, 0.1);
-}
-
-.winner-banner.dealer {
-  color: #e74c3c;
-  background: rgba(231, 76, 60, 0.1);
-}
-
-.winner-banner.draw {
-  color: #ecf0f1;
-  background: rgba(236, 240, 241, 0.1);
-}
-
-/* 승자 테두리 강조 */
+/* 7. 승자 강조 */
 .winner-border {
-  border: 2px solid #f1c40f;
-  box-shadow: 0 0 20px rgba(241, 196, 15, 0.3);
-  transform: scale(1.02);
+  outline: 3px solid #f1c40f;
+  background: rgba(241, 196, 15, 0.1) !important;
+  /* --- 추가된 애니메이션 속성 --- */
+  animation: gold-pulse 1.5s infinite;
   transition: all 0.3s ease;
 }
 
-/* 구분선 텍스트 */
+/* 8. 텍스트 정보 압축 */
+.hand-name {
+  height: 30px;
+  margin-top: 5px;
+  font-size: 1rem;
+  color: #f1c40f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+/* 9. 구분선 최소화 */
 .divider {
   display: flex;
   align-items: center;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 0.9rem;
-  margin: 20px 0;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.7rem;
+  margin: 2px 0;
 }
 
 .divider::before,
@@ -191,5 +167,52 @@
   flex: 1;
   height: 1px;
   background: rgba(255, 255, 255, 0.1);
-  margin: 0 15px;
+  margin: 0 10px;
+}
+
+/* -------------------------------------------------- */
+/* --- 새로 추가된 애니메이션 키프레임 (CSS 하단) --- */
+/* -------------------------------------------------- */
+
+@keyframes card-fall {
+  0% {
+    opacity: 0;
+    transform: translateY(-30px) rotateY(90deg) scale(0.8);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotateY(0) scale(1);
+  }
+}
+
+@keyframes gold-pulse {
+  0% {
+    box-shadow: 0 0 5px #f1c40f;
+  }
+
+  50% {
+    box-shadow: 0 0 25px #f1c40f;
+  }
+
+  100% {
+    box-shadow: 0 0 5px #f1c40f;
+  }
+}
+
+/* 순차적 등장을 위한 기본 딜레이 (필요시 App.jsx에서 인라인으로 조절 가능) */
+.card:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.card:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.card:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+.card:nth-child(5) {
+  animation-delay: 0.4s;
 }
