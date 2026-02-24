@@ -7,12 +7,26 @@ function App() {
   const [phase, setPhase] = useState("waiting");
   const [loading, setLoading] = useState(false);
 
-  const isCardInBestHand = (card, bestCards) => {
-    if (!card || !bestCards) return false;
-    return bestCards.some(bc => bc.rank === card.rank && bc.suit === card.suit);
+  // 카드 비교 함수 (rank와 suit가 모두 같아야 함)
+  const isCardInList = (card, cardList) => {
+    if (!card || !cardList) return false;
+    return cardList.some(bc => bc.rank === card.rank && bc.suit === card.suit);
   };
 
-  const renderCard = (card, index, isCommunity = false, isHighlight = false) => {
+  // 하이라이트 타입 결정 함수
+  const getHighlightClass = (card, isWinnerSide) => {
+    if (phase !== "showdown" || !isWinnerSide || !gameData) return "";
+
+    // 승리한 쪽의 데이터를 사용 (player_best_... 또는 dealer_best_...)
+    const bestMain = gameData.winner === 'player' ? gameData.player_best_main_cards : gameData.dealer_best_main_cards;
+    const bestKickers = gameData.winner === 'player' ? gameData.player_best_kickers : gameData.dealer_best_kickers;
+
+    if (isCardInList(card, bestMain)) return "main-highlight";
+    if (isCardInList(card, bestKickers)) return "kicker-highlight";
+    return "";
+  };
+
+  const renderCard = (card, index, isCommunity = false, highlightClass = "") => {
     if (!card) return null;
     const isRed = ['♥', '♦'].includes(card.suit);
     let delay = isCommunity ? (index < 3 ? index * 0.1 : 0.05) : index * 0.1;
@@ -20,7 +34,7 @@ function App() {
     return (
       <div
         key={`${card.rank}${card.suit}`}
-        className={`card ${isRed ? 'red' : 'black'} ${isHighlight ? 'highlight' : ''}`}
+        className={`card ${isRed ? 'red' : 'black'} ${highlightClass}`}
         style={{ animationDelay: `${delay}s` }}
       >
         <span className="rank">{card.rank}</span>
@@ -61,11 +75,7 @@ function App() {
           <div className="card-row">
             {phase === "showdown" && gameData?.dealer_hand ?
               gameData.dealer_hand.map((card, i) =>
-                // 수정: 쇼다운 상태 + 승자가 dealer일 때만 하이라이트
-                renderCard(
-                  card, i, false,
-                  phase === "showdown" && gameData.winner === 'dealer' && isCardInBestHand(card, gameData?.dealer_best_cards)
-                )
+                renderCard(card, i, false, getHighlightClass(card, gameData.winner === 'dealer'))
               ) : (
                 <>
                   <div className="card-placeholder" style={{ animationDelay: '0s' }}></div>
@@ -83,16 +93,9 @@ function App() {
         {/* 2. 공통 카드 섹션 */}
         <div className="section community-section">
           <div className="card-row">
-            {gameData?.community_cards?.map((card, i) => {
-              // 승자가 누구냐에 따라 비교할 리스트 선택
-              const winnerCards = gameData.winner === 'player' ? gameData.player_best_cards : gameData.dealer_best_cards;
-
-              // 수정: 쇼다운 상태 + 승자가 존재할 때만 해당 승자의 족보 카드 하이라이트
-              return renderCard(
-                card, i, true,
-                phase === "showdown" && !!gameData.winner && isCardInBestHand(card, winnerCards)
-              );
-            })}
+            {gameData?.community_cards?.map((card, i) =>
+              renderCard(card, i, true, getHighlightClass(card, !!gameData.winner))
+            )}
           </div>
         </div>
 
@@ -103,11 +106,7 @@ function App() {
           <h2>Your Hand</h2>
           <div className="card-row">
             {gameData?.player_hand?.map((card, i) =>
-              // 수정: 쇼다운 상태 + 승자가 player일 때만 하이라이트
-              renderCard(
-                card, i, false,
-                phase === "showdown" && gameData.winner === 'player' && isCardInBestHand(card, gameData?.player_best_cards)
-              )
+              renderCard(card, i, false, getHighlightClass(card, gameData.winner === 'player'))
             )}
           </div>
           <div className={`hand-name ${phase === "showdown" && gameData?.winner === 'player' ? 'active' : ''}`}>

@@ -171,26 +171,55 @@ h2 {
   margin: 0 10px;
 }
 
-/* 10. 족보 하이라이트 효과 */
+/* 10. 족보 하이라이트 효과 (메인 vs 키커 차별화) */
 
-/* 족보에 포함된 5장의 카드 강조 */
-.card.highlight {
+/* 메인 족보 본체 (강렬한 금빛) */
+.card.main-highlight {
   z-index: 10;
-  transform: scale(1.1) translateY(-10px);
-  box-shadow: 0 0 20px #f1c40f, 0 0 40px rgba(241, 196, 15, 0.6);
-  border: 2px solid #f1c40f;
+  transform: scale(1.15) translateY(-18px);
+  /* 더 높이 솟아오름 */
+  box-shadow: 0 0 25px #f1c40f, 0 0 50px rgba(241, 196, 15, 0.7);
+  border: 3px solid #f1c40f;
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: main-float 2s ease-in-out infinite;
+  /* 위아래로 둥둥 떠있는 효과 추가 */
+}
+
+/* 키커 카드 (은은한 백금/은빛) */
+.card.kicker-highlight {
+  z-index: 5;
+  transform: scale(1.05) translateY(-8px);
+  /* 메인보다는 낮게 솟음 */
+  box-shadow: 0 0 15px #ffffff, 0 0 30px rgba(255, 255, 255, 0.4);
+  border: 2px solid #e0e0e0;
+  opacity: 0.95;
   transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+/* 텍스트 효과 보강 */
 .hand-name.active {
   color: #fff;
   text-shadow: 0 0 10px #f1c40f, 0 0 20px #f39c12;
   transform: scale(1.2);
 }
 
+/* --- 추가 애니메이션 키프레임 --- */
+@keyframes main-float {
+
+  0%,
+  100% {
+    transform: scale(1.15) translateY(-18px);
+  }
+
+  50% {
+    transform: scale(1.15) translateY(-25px);
+    /* 최고점에서 조금 더 올라감 */
+  }
+}
+
 /* 승자 섹션 내의 카드들만 조금 더 선명하게 */
 .winner-border .card {
-  border-color: rgba(241, 196, 15, 0.5);
+  border-color: rgba(241, 196, 15, 0.3);
 }
 
 /* --- 애니메이션 키프레임 --- */
