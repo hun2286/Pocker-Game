@@ -150,6 +150,7 @@ h2 {
   align-items: center;
   justify-content: center;
   font-weight: bold;
+  transition: all 0.3s ease;
 }
 
 /* 9. 구분선 */
@@ -170,10 +171,29 @@ h2 {
   margin: 0 10px;
 }
 
-/* -------------------------------------------------- */
-/* --- 애니메이션 키프레임 --- */
-/* -------------------------------------------------- */
+/* 10. 족보 하이라이트 효과 */
 
+/* 족보에 포함된 5장의 카드 강조 */
+.card.highlight {
+  z-index: 10;
+  transform: scale(1.1) translateY(-10px);
+  box-shadow: 0 0 20px #f1c40f, 0 0 40px rgba(241, 196, 15, 0.6);
+  border: 2px solid #f1c40f;
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.hand-name.active {
+  color: #fff;
+  text-shadow: 0 0 10px #f1c40f, 0 0 20px #f39c12;
+  transform: scale(1.2);
+}
+
+/* 승자 섹션 내의 카드들만 조금 더 선명하게 */
+.winner-border .card {
+  border-color: rgba(241, 196, 15, 0.5);
+}
+
+/* --- 애니메이션 키프레임 --- */
 @keyframes card-fall {
   0% {
     opacity: 0;
@@ -199,9 +219,7 @@ h2 {
   }
 }
 
-/* -------------------------------------------------- */
 /* --- 순차적 등장 딜레이 수정 (Turn, River 속도 개선) --- */
-/* -------------------------------------------------- */
 
 /* Flop (1, 2, 3번째 카드) */
 .card:nth-child(2) {
