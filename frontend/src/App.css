@@ -77,7 +77,6 @@ h2 {
   opacity: 0.8;
 }
 
-/* 공간이 생길 때 카드가 옆으로 밀리는 현상을 부드럽게 처리 */
 .card-row {
   display: flex;
   justify-content: center;
@@ -85,7 +84,6 @@ h2 {
   height: 85px;
   align-items: center;
   transition: all 0.3s ease;
-  /* 중요: 새로운 카드가 들어올 때 공간 변화를 부드럽게 */
 }
 
 /* 5. 카드 크기 및 애니메이션 */
@@ -102,7 +100,6 @@ h2 {
   font-size: 18px;
   font-weight: bold;
   box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
-  /* 등장 속도를 0.3s로 더 민첩하게 변경 */
   animation: card-fall 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   opacity: 0;
   backface-visibility: hidden;
@@ -153,6 +150,12 @@ h2 {
   transition: all 0.3s ease;
 }
 
+.hand-name.active {
+  color: #fff;
+  text-shadow: 0 0 10px #f1c40f, 0 0 20px #f39c12;
+  transform: scale(1.1);
+}
+
 /* 9. 구분선 */
 .divider {
   display: flex;
@@ -171,55 +174,14 @@ h2 {
   margin: 0 10px;
 }
 
-/* 10. 족보 하이라이트 효과 (메인 vs 키커 차별화) */
-
-/* 메인 족보 본체 (강렬한 금빛) */
-.card.main-highlight {
+/* 10. 족보 하이라이트 효과 (통합 버전) */
+/* 10. 족보 하이라이트 효과 */
+.card.highlight {
   z-index: 10;
-  transform: scale(1.15) translateY(-18px);
-  /* 더 높이 솟아오름 */
-  box-shadow: 0 0 25px #f1c40f, 0 0 50px rgba(241, 196, 15, 0.7);
-  border: 3px solid #f1c40f;
-  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  animation: main-float 2s ease-in-out infinite;
-  /* 위아래로 둥둥 떠있는 효과 추가 */
-}
-
-/* 키커 카드 (은은한 백금/은빛) */
-.card.kicker-highlight {
-  z-index: 5;
-  transform: scale(1.05) translateY(-8px);
-  /* 메인보다는 낮게 솟음 */
-  box-shadow: 0 0 15px #ffffff, 0 0 30px rgba(255, 255, 255, 0.4);
-  border: 2px solid #e0e0e0;
-  opacity: 0.95;
-  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-/* 텍스트 효과 보강 */
-.hand-name.active {
-  color: #fff;
-  text-shadow: 0 0 10px #f1c40f, 0 0 20px #f39c12;
-  transform: scale(1.2);
-}
-
-/* --- 추가 애니메이션 키프레임 --- */
-@keyframes main-float {
-
-  0%,
-  100% {
-    transform: scale(1.15) translateY(-18px);
-  }
-
-  50% {
-    transform: scale(1.15) translateY(-25px);
-    /* 최고점에서 조금 더 올라감 */
-  }
-}
-
-/* 승자 섹션 내의 카드들만 조금 더 선명하게 */
-.winner-border .card {
-  border-color: rgba(241, 196, 15, 0.3);
+  transform: translateY(-12px) scale(1.1);
+  box-shadow: 0 0 20px #f1c40f;
+  border: 2px solid #f1c40f !important;
+  background: white !important;
 }
 
 /* --- 애니메이션 키프레임 --- */
@@ -227,7 +189,6 @@ h2 {
   0% {
     opacity: 0;
     transform: translateY(-20px) rotateY(45deg) scale(0.9);
-    /* 시작 높이를 낮춰서 더 빨리 떨어지게 */
   }
 
   100% {
@@ -248,9 +209,7 @@ h2 {
   }
 }
 
-/* --- 순차적 등장 딜레이 수정 (Turn, River 속도 개선) --- */
-
-/* Flop (1, 2, 3번째 카드) */
+/* Flop/Turn/River 딜레이 */
 .card:nth-child(2) {
   animation-delay: 0.1s;
 }
@@ -259,8 +218,6 @@ h2 {
   animation-delay: 0.2s;
 }
 
-/* Turn & River (4, 5번째 카드) */
-/* 0.3s -> 0.05s로 줄여서 공간이 생김과 거의 동시에 나타나도록 수정 */
 .card:nth-child(4),
 .card:nth-child(5) {
   animation-delay: 0.05s !important;
