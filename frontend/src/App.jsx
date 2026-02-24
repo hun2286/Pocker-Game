@@ -7,7 +7,6 @@ function App() {
   const [phase, setPhase] = useState("waiting");
   const [loading, setLoading] = useState(false);
 
-  // [추가] 특정 카드가 족보 구성 카드 리스트에 포함되는지 확인하는 함수
   const isCardInBestHand = (card, bestCards) => {
     if (!card || !bestCards) return false;
     return bestCards.some(bc => bc.rank === card.rank && bc.suit === card.suit);
@@ -62,7 +61,6 @@ function App() {
           <div className="card-row">
             {phase === "showdown" && gameData?.dealer_hand ?
               gameData.dealer_hand.map((card, i) =>
-                // 수정: 딜러 카드 중 족보 구성에 포함된 카드만 하이라이트
                 renderCard(card, i, false, isCardInBestHand(card, gameData?.dealer_best_cards))
               ) : (
                 <>
@@ -82,8 +80,8 @@ function App() {
         <div className="section community-section">
           <div className="card-row">
             {gameData?.community_cards?.map((card, i) => {
-              // 수정: 현재 승자의 족보 구성 리스트를 가져와서 비교
               const bestCards = gameData.winner === 'player' ? gameData.player_best_cards : gameData.dealer_best_cards;
+              // 이미 showdown 조건이 잘 붙어있습니다.
               return renderCard(card, i, true, phase === "showdown" && isCardInBestHand(card, bestCards));
             })}
           </div>
@@ -96,8 +94,8 @@ function App() {
           <h2>Your Hand</h2>
           <div className="card-row">
             {gameData?.player_hand?.map((card, i) =>
-              // 수정: 내 카드 중 족보 구성에 포함된 카드만 하이라이트
-              renderCard(card, i, false, isCardInBestHand(card, gameData?.player_best_cards))
+              // [중요 수정]: phase === "showdown" 조건을 추가하여 마지막에만 빛나도록 설정
+              renderCard(card, i, false, phase === "showdown" && isCardInBestHand(card, gameData?.player_best_cards))
             )}
           </div>
           <div className={`hand-name ${phase === "showdown" && gameData?.winner === 'player' ? 'active' : ''}`}>
