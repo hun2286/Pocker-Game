@@ -7,85 +7,110 @@ RANK_MAP = {r: i for i, r in enumerate(RANKS, 2)}
 
 
 def evaluate_hand(cards):
-    rank_values = sorted([RANK_MAP[c["rank"]] for c in cards], reverse=True)
+    # 계산의 편의를 위해 카드 객체에 숫자 가치(value)를 미리 추가
+    for c in cards:
+        c["value"] = RANK_MAP[c["rank"]]
+
+    # 숫자 순서대로 정렬
+    sorted_cards = sorted(cards, key=lambda x: x["value"], reverse=True)
+    rank_values = [c["value"] for c in sorted_cards]
     suit_counts = Counter([c["suit"] for c in cards])
     rank_counts = Counter(rank_values)
 
     # 1. 플러시 확인
     flush_suit = next((s for s, count in suit_counts.items() if count >= 5), None)
 
-    # 2. 스트레이트 확인용 함수
-    def get_straight_high(ranks):
-        unique_ranks = sorted(list(set(ranks)), reverse=True)
-        if 14 in unique_ranks:
-            unique_ranks.append(1)
-        for i in range(len(unique_ranks) - 4):
-            if unique_ranks[i] - unique_ranks[i + 4] == 4:
-                return unique_ranks[i]
+    # 2. 스트레이트 확인용 함수 (해당하는 카드 객체 5장을 반환)
+    def get_straight_cards(target_cards):
+        unique_cards = []
+        seen_ranks = set()
+        for c in sorted(target_cards, key=lambda x: x["value"], reverse=True):
+            if c["value"] not in seen_ranks:
+                unique_cards.append(c)
+                seen_ranks.add(c["value"])
+
+        # Ace-Low (A, 2, 3, 4, 5) 처리를 위해 Ace 복사본 추가
+        ace_card = next((c for c in unique_cards if c["value"] == 14), None)
+        if ace_card:
+            low_ace = ace_card.copy()
+            low_ace["value"] = 1
+            unique_cards.append(low_ace)
+
+        for i in range(len(unique_cards) - 4):
+            if unique_cards[i]["value"] - unique_cards[i + 4]["value"] == 4:
+                return unique_cards[i : i + 5]
         return None
 
-    # 3. 족보 판정 (높은 순서대로)
+    # 3. 족보 판정 시작
 
-    # 3-1. 스트레이트 플러시 계열
+    # 3-1. 스트레이트 플러시
     if flush_suit:
-        flush_cards_ranks = [
-            RANK_MAP[c["rank"]] for c in cards if c["suit"] == flush_suit
-        ]
-        sf_high = get_straight_high(flush_cards_ranks)
-        if sf_high:
-            if sf_high == 14:
-                return {
-                    "name": "로열 스트레이트 플러시 (Royal Flush)",
-                    "score": 10,
-                    "power": 14,
-                }
+        f_cards = [c for c in cards if c["suit"] == flush_suit]
+        sf_cards = get_straight_cards(f_cards)
+        if sf_cards:
+            is_royal = any(c["value"] == 14 for c in sf_cards) and any(
+                c["value"] == 10 for c in sf_cards
+            )
             return {
-                "name": "스트레이트 플러시 (Straight Flush)",
-                "score": 9,
-                "power": sf_high,
+                "name": "로열 스트레이트 플러시" if is_royal else "스트레이트 플러시",
+                "score": 10 if is_royal else 9,
+                "cards": sf_cards[:5],
             }
 
-    # 3-2. 포카드 (Four of a Kind)
-    if 4 in rank_counts.values():
-        four_rank = max([r for r, c in rank_counts.items() if c == 4])
-        return {"name": "포카드 (Four of a Kind)", "score": 8, "power": four_rank}
+    # 3-2. 포카드 (4장)
+    for r, count in rank_counts.items():
+        if count == 4:
+            four_kind = [c for c in cards if c["value"] == r]
+            return {"name": "포카드", "score": 8, "cards": four_kind}
 
-    # 3-3. 풀하우스 (Full House)
-    counts = sorted(rank_counts.values(), reverse=True)
-    if counts[0] == 3 and (len(counts) > 1 and counts[1] >= 2):
-        three_rank = max([r for r, c in rank_counts.items() if c == 3])
-        return {"name": "풀하우스 (Full House)", "score": 7, "power": three_rank}
+    # 3-3. 풀하우스 (3장 + 2장 = 5장)
+    three_rank = [r for r, count in rank_counts.items() if count == 3]
+    pair_rank = [r for r, count in rank_counts.items() if count >= 2]
+    if three_rank and len(pair_rank) > 1:
+        t_rank = max(three_rank)
+        p_rank = max([r for r in pair_rank if r != t_rank])
+        best_cards = [c for c in cards if c["value"] == t_rank] + [
+            c for c in cards if c["value"] == p_rank
+        ][:2]
+        return {"name": "풀하우스", "score": 7, "cards": best_cards}
 
-    # 3-4. 플러시 (Flush)
+    # 3-4. 플러시 (5장)
     if flush_suit:
-        flush_high = max(
-            [RANK_MAP[c["rank"]] for c in cards if c["suit"] == flush_suit]
+        f_cards = sorted(
+            [c for c in cards if c["suit"] == flush_suit],
+            key=lambda x: x["value"],
+            reverse=True,
         )
-        return {"name": "플러시 (Flush)", "score": 6, "power": flush_high}
+        return {"name": "플러시", "score": 6, "cards": f_cards[:5]}
 
-    # 3-5. 스트레이트 (Straight)
-    straight_high = get_straight_high(rank_values)
-    if straight_high:
-        return {"name": "스트레이트 (Straight)", "score": 5, "power": straight_high}
+    # 3-5. 스트레이트 (5장)
+    st_cards = get_straight_cards(cards)
+    if st_cards:
+        return {"name": "스트레이트", "score": 5, "cards": st_cards}
 
-    # 3-6. 트리플 (Three of a Kind)
+    # 3-6. 트리플 (3장)
     if 3 in rank_counts.values():
-        three_rank = max([r for r, c in rank_counts.items() if c == 3])
-        return {"name": "트리플 (Three of a Kind)", "score": 4, "power": three_rank}
-
-    # 3-7. 투페어 (Two Pair)
-    if list(rank_counts.values()).count(2) >= 2:
-        pairs = sorted([r for r, c in rank_counts.items() if c == 2], reverse=True)
+        t_rank = max([r for r, count in rank_counts.items() if count == 3])
         return {
-            "name": "투페어 (Two Pair)",
-            "score": 3,
-            "power": pairs[0],
-        }  # 더 높은 페어의 숫자
+            "name": "트리플",
+            "score": 4,
+            "cards": [c for c in cards if c["value"] == t_rank],
+        }
 
-    # 3-8. 원페어 (One Pair)
+    # 3-7. 투페어 (4장)
+    pairs = sorted([r for r, count in rank_counts.items() if count == 2], reverse=True)
+    if len(pairs) >= 2:
+        best_cards = [c for c in cards if c["value"] in pairs[:2]]
+        return {"name": "투페어", "score": 3, "cards": best_cards}
+
+    # 3-8. 원페어 (2장)
     if 2 in rank_counts.values():
-        pair_rank = max([r for r, c in rank_counts.items() if c == 2])
-        return {"name": "원페어 (One Pair)", "score": 2, "power": pair_rank}
+        p_rank = max([r for r, count in rank_counts.items() if count == 2])
+        return {
+            "name": "원페어",
+            "score": 2,
+            "cards": [c for c in cards if c["value"] == p_rank],
+        }
 
-    # 3-9. 하이카드 (High Card)
-    return {"name": "하이카드 (High Card)", "score": 1, "power": rank_values[0]}
+    # 3-9. 하이카드 (1장)
+    return {"name": "하이카드", "score": 1, "cards": [sorted_cards[0]]}
