@@ -17,22 +17,17 @@ HAND_RANKING = {
 def determine_winner(player_res, dealer_res):
     """
     player_res, dealer_res 예시:
-    {"name": "원페어", "score": 2, "power": 14}
+    {"name": "원페어", "score": 2, "cards": [...]}
     """
 
-    # 1. 족보의 등급(score)을 먼저 비교합니다 (예: 트리플 vs 원페어)
+    # 1. evaluator.py에서 계산해준 score(족보 등급)를 비교합니다.
     if player_res["score"] > dealer_res["score"]:
         return "player"
     elif dealer_res["score"] > player_res["score"]:
         return "dealer"
 
     # 2. 만약 족보 등급이 같다면? (예: 둘 다 원페어)
-    # 족보를 구성하는 가장 높은 숫자인 'power'를 비교합니다.
     else:
-        if player_res["power"] > dealer_res["power"]:
-            return "player"
-        elif dealer_res["power"] > player_res["power"]:
-            return "dealer"
-        else:
-            # 족보도 같고, 그 숫자의 힘도 같다면 무승부 (이후 '키커' 판정으로 확장 가능)
-            return "draw"
+        # 현재는 족보가 같으면 비김(draw) 처리합니다.
+        # (더 정교하게 하려면 여기서 하이카드를 비교해야 하지만, 우선 에러 해결이 먼저!)
+        return "draw"
