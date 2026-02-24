@@ -72,7 +72,13 @@ function App() {
             <div className="card-row">
               {gameData.player_hand.map((card, i) => renderCard(card, i))}
             </div>
-            <p className="hand-name">Your Best: <strong>{gameData.player_best}</strong></p>
+            <p className="hand-name">
+              Your Best: <strong>{gameData.player_best}</strong>
+              {/* power 정보를 괄호 안에 살짝 보여주기 */}
+              {gameData.player_score_info && (
+                <span className="power-text"> (High: {gameData.player_score_info.power})</span>
+              )}
+            </p>
           </div>
         </div>
       )}
