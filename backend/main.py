@@ -1,11 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from modules.cards import create_deck, deal_initial_cards
+from modules.cards import create_deck
 from modules.evaluator import evaluate_hand
 from modules.game_engine import determine_winner
 
 app = FastAPI()
 
+# CORS 설정
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -14,27 +15,76 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 서버가 기억할 게임 세션
+game_state = {
+    "deck": [],
+    "player_hand": [],
+    "dealer_hand": [],
+    "community_cards": [],
+    "phase": "waiting",
+}
 
-@app.get("/deal")
-def deal_cards():
+
+@app.get("/start")
+def start_game():
+    """게임 초기화 및 내 카드 배분 (Pre-flop)"""
     deck = create_deck()
-    # 카드 배분 (modules/cards.py 활용)
-    player_hand, dealer_hand, community_cards = deal_initial_cards(deck)
+    game_state["deck"] = deck
+    game_state["player_hand"] = [deck.pop(), deck.pop()]
+    game_state["dealer_hand"] = [deck.pop(), deck.pop()]
+    game_state["community_cards"] = []
+    game_state["phase"] = "pre-flop"
 
-    # 족보 판정 (modules/evaluator.py 활용)
-    player_best = evaluate_hand(player_hand + community_cards)
-    dealer_best = evaluate_hand(dealer_hand + community_cards)
-
-    # 승패 판정 (modules/game_engine.py 활용)
-    winner = determine_winner(player_best, dealer_best)
+    # 시작하자마자 내 카드 2장으로 족보 계산
+    p_res = evaluate_hand(game_state["player_hand"])
 
     return {
-        "player_hand": player_hand,
-        "dealer_hand": dealer_hand,
-        "community_cards": community_cards,
-        "player_best": player_best["name"],
-        "dealer_best": dealer_best["name"],
-        "winner": winner,
-        "player_score_info": player_best,
-        "dealer_score_info": dealer_best,
+        "phase": game_state["phase"],
+        "player_hand": game_state["player_hand"],
+        "community_cards": game_state["community_cards"],
+        "player_best": p_res["name"],  # 점수 추가
+    }
+
+
+@app.get("/next")
+def next_phase():
+    phase = game_state["phase"]
+    deck = game_state["deck"]
+
+    if phase == "pre-flop":
+        game_state["community_cards"] += [deck.pop() for _ in range(3)]
+        game_state["phase"] = "flop"
+    elif phase == "flop":
+        game_state["community_cards"].append(deck.pop())
+        game_state["phase"] = "turn"
+    elif phase == "turn":
+        game_state["community_cards"].append(deck.pop())
+        game_state["phase"] = "river"
+    elif phase == "river":
+        # 승패 판정 로직
+        p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
+        d_res = evaluate_hand(game_state["dealer_hand"] + game_state["community_cards"])
+        winner = determine_winner(p_res, d_res)
+        game_state["phase"] = "showdown"
+
+        return {
+            "phase": game_state["phase"],
+            "community_cards": game_state["community_cards"],
+            "player_hand": game_state["player_hand"],
+            "dealer_hand": game_state["dealer_hand"],
+            "winner": winner,
+            "player_best": p_res["name"],
+            "dealer_best": d_res["name"],
+            "player_score_info": p_res,
+            "dealer_score_info": d_res,
+        }
+
+    # Flop, Turn, River 단계에서 실시간 점수 계산
+    p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
+
+    return {
+        "phase": game_state["phase"],
+        "community_cards": game_state["community_cards"],
+        "player_hand": game_state["player_hand"],
+        "player_best": p_res["name"],  # 매 단계마다 실시간 점수 반환
     }
