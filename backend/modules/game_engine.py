@@ -14,13 +14,25 @@ HAND_RANKING = {
 }
 
 
-def determine_winner(player_best, dealer_best):
-    p_score = HAND_RANKING.get(player_best, 0)
-    d_score = HAND_RANKING.get(dealer_best, 0)
+def determine_winner(player_res, dealer_res):
+    """
+    player_res, dealer_res 예시:
+    {"name": "원페어", "score": 2, "power": 14}
+    """
 
-    if p_score > d_score:
+    # 1. 족보의 등급(score)을 먼저 비교합니다 (예: 트리플 vs 원페어)
+    if player_res["score"] > dealer_res["score"]:
         return "player"
-    elif d_score > p_score:
+    elif dealer_res["score"] > player_res["score"]:
         return "dealer"
+
+    # 2. 만약 족보 등급이 같다면? (예: 둘 다 원페어)
+    # 족보를 구성하는 가장 높은 숫자인 'power'를 비교합니다.
     else:
-        return "draw"
+        if player_res["power"] > dealer_res["power"]:
+            return "player"
+        elif dealer_res["power"] > player_res["power"]:
+            return "dealer"
+        else:
+            # 족보도 같고, 그 숫자의 힘도 같다면 무승부 (이후 '키커' 판정으로 확장 가능)
+            return "draw"

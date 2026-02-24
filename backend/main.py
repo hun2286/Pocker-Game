@@ -32,7 +32,9 @@ def deal_cards():
         "player_hand": player_hand,
         "dealer_hand": dealer_hand,
         "community_cards": community_cards,
-        "player_best": player_best,
-        "dealer_best": dealer_best,
+        "player_best": player_best["name"],
+        "dealer_best": dealer_best["name"],
         "winner": winner,
+        "player_score_info": player_best,
+        "dealer_score_info": dealer_best,
     }
