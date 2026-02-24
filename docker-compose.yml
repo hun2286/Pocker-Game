@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  # 백엔드 서비스
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app # 코드 수정 시 즉시 반영을 위한 볼륨 연결
+    environment:
+      - ENV=dev
+
+  # 프론트엔드 서비스
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # 호스트의 node_modules와 충돌 방지
+    depends_on:
+      - backend # 백엔드가 먼저 실행되도록 설정
