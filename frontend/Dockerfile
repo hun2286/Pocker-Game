@@ -1,5 +1,5 @@
-# 1. 노드 18 이미지 사용
-FROM node:18-alpine
+# 1. 노드 20 사용
+FROM node:20-alpine
 
 # 2. 작업 디렉토리 설정
 WORKDIR /app
