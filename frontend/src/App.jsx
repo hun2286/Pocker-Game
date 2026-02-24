@@ -32,8 +32,8 @@ function App() {
   const handleGameAction = async () => {
     setLoading(true);
     const url = phase === "waiting" || phase === "showdown"
-      ? 'http://127.0.0.1:8000/start'
-      : 'http://127.0.0.1:8000/next';
+      ? 'http://localhost:8000/start'
+      : 'http://localhost:8000/next';
 
     try {
       const response = await axios.get(url);
