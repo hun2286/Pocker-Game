@@ -15,11 +15,6 @@ HAND_RANKING = {
 
 
 def determine_winner(player_res, dealer_res):
-    """
-    player_res, dealer_res 예시:
-    {"name": "원페어", "score": 2, "power": 14}
-    """
-
     # 1. 족보의 등급(score)을 먼저 비교합니다 (예: 트리플 vs 원페어)
     if player_res["score"] > dealer_res["score"]:
         return "player"
