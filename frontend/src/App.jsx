@@ -52,10 +52,16 @@ function App() {
             <div className="card-row">
               {gameData.dealer_hand.map((card, i) => renderCard(card, i))}
             </div>
-            <p className="hand-name">Dealer's Best: <strong>{gameData.dealer_best}</strong></p>
+            <p className="hand-name">
+              Dealer's Best: <strong>{gameData.dealer_best}</strong>
+              {/* 딜러의 상세 정보(Power) 추가 부분 */}
+              {gameData.dealer_score_info && (
+                <span className="power-text"> (High: {gameData.dealer_score_info.power})</span>
+              )}
+            </p>
           </div>
 
-          <div className="divider">Community Cards</div>
+          <div className="divider"></div>
 
           {/* 3. 공통 카드 섹션 */}
           <div className="section community-section">
@@ -64,7 +70,7 @@ function App() {
             </div>
           </div>
 
-          <div className="divider">Your Hand</div>
+          <div className="divider"></div>
 
           {/* 4. 플레이어 섹션 (승자일 때 강조 효과) */}
           <div className={`section player-section ${gameData.winner === 'player' ? 'winner-border' : ''}`}>
