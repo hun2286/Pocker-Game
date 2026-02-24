@@ -7,28 +7,23 @@ function App() {
   const [phase, setPhase] = useState("waiting");
   const [loading, setLoading] = useState(false);
 
-  /// 1. 카드 렌더링 함수 (딜레이 로직 최적화)
-  const renderCard = (card, index, isCommunity = false) => {
+  // 1. 카드 렌더링 함수 (하이라이트 파라미터 추가)
+  const renderCard = (card, index, isCommunity = false, isHighlight = false) => {
     if (!card) return null;
     const isRed = ['♥', '♦'].includes(card.suit);
 
-    // 핵심 수정: 새로 추가되는 카드(Turn, River)는 대기 시간 없이 즉시 등장하도록 설정
     let delay = 0;
     if (isCommunity) {
-      // Flop(0,1,2번 인덱스)일 때는 0.1s 간격으로 순차 등장
-      // Turn(3번), River(4번)는 인덱스 누적 없이 0.05s만 대기
       delay = index < 3 ? index * 0.1 : 0.05;
     } else {
-      // 플레이어/딜러 핸드는 2장이므로 짧은 간격 유지
       delay = index * 0.1;
     }
 
     return (
       <div
-        // key 값에서 index를 제거하면 리액트가 기존 카드를 재사용하므로 
-        // 이미 깔린 카드는 애니메이션이 다시 실행되지 않습니다.
         key={`${card.rank}${card.suit}`}
-        className={`card ${isRed ? 'red' : 'black'}`}
+        // isHighlight가 true이면 'highlight' 클래스가 추가됩니다.
+        className={`card ${isRed ? 'red' : 'black'} ${isHighlight ? 'highlight' : ''}`}
         style={{ animationDelay: `${delay}s` }}
       >
         <span className="rank">{card.rank}</span>
@@ -71,25 +66,27 @@ function App() {
           <h2>Dealer Hand</h2>
           <div className="card-row">
             {phase === "showdown" && gameData?.dealer_hand ?
-              gameData.dealer_hand.map((card, i) => renderCard(card, i)) :
+              // 딜러가 이겼을 때만 카드를 하이라이트 처리
+              gameData.dealer_hand.map((card, i) => renderCard(card, i, false, gameData?.winner === 'dealer')) :
               <>
-                {/* 딜러 뒷면 카드도 순차적으로 등장하도록 딜레이 부여 */}
                 <div className="card-placeholder" style={{ animationDelay: '0s' }}></div>
                 <div className="card-placeholder" style={{ animationDelay: '0.1s' }}></div>
               </>
             }
           </div>
-          <div className="hand-name">
+          {/* 딜러가 이기면 글자도 번쩍이게 active 클래스 추가 */}
+          <div className={`hand-name ${phase === "showdown" && gameData?.winner === 'dealer' ? 'active' : ''}`}>
             {phase === "showdown" && gameData?.dealer_best}
           </div>
         </div>
 
         <div className="divider">Community Cards</div>
 
-        {/* 2. 공통 카드 섹션 (세 번째 인자에 true 전달) */}
+        {/* 2. 공통 카드 섹션 */}
         <div className="section community-section">
           <div className="card-row">
-            {gameData?.community_cards?.map((card, i) => renderCard(card, i, true))}
+            {/* 공통 카드는 쇼다운 시 모두 하이라이트 효과를 받도록 설정 (혹은 승자 조건에 따라 조절 가능) */}
+            {gameData?.community_cards?.map((card, i) => renderCard(card, i, true, phase === "showdown"))}
           </div>
         </div>
 
@@ -99,9 +96,11 @@ function App() {
         <div className={`section player-section ${phase === 'showdown' && gameData?.winner === 'player' ? 'winner-border' : ''}`}>
           <h2>Your Hand</h2>
           <div className="card-row">
-            {gameData?.player_hand?.map((card, i) => renderCard(card, i))}
+            {/* 플레이어가 이겼을 때만 카드를 하이라이트 처리 */}
+            {gameData?.player_hand?.map((card, i) => renderCard(card, i, false, phase === "showdown" && gameData?.winner === 'player'))}
           </div>
-          <div className="hand-name">
+          {/* 플레이어가 이기면 글자도 번쩍이게 active 클래스 추가 */}
+          <div className={`hand-name ${phase === "showdown" && gameData?.winner === 'player' ? 'active' : ''}`}>
             {gameData?.player_best && `Your Best: ${gameData.player_best}`}
           </div>
         </div>
