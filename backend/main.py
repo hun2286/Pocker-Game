@@ -61,7 +61,7 @@ def next_phase():
         game_state["community_cards"].append(deck.pop())
         game_state["phase"] = "river"
     elif phase == "river":
-        # 승패 판정 로직
+        # 1. 승패 판정 로직
         p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
         d_res = evaluate_hand(game_state["dealer_hand"] + game_state["community_cards"])
         winner = determine_winner(p_res, d_res)
@@ -75,6 +75,8 @@ def next_phase():
             "winner": winner,
             "player_best": p_res["name"],
             "dealer_best": d_res["name"],
+            "player_best_cards": p_res["cards"],  # 핵심: 족보 구성 카드 전달
+            "dealer_best_cards": d_res["cards"],  # 핵심: 족보 구성 카드 전달
             "player_score_info": p_res,
             "dealer_score_info": d_res,
         }
@@ -86,5 +88,6 @@ def next_phase():
         "phase": game_state["phase"],
         "community_cards": game_state["community_cards"],
         "player_hand": game_state["player_hand"],
-        "player_best": p_res["name"],  # 매 단계마다 실시간 점수 반환
+        "player_best": p_res["name"],
+        "player_best_cards": p_res["cards"],  # 매 단계마다 하이라이트 가능하도록 추가
     }
