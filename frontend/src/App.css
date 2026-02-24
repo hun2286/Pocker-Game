@@ -51,7 +51,7 @@ h1 {
   display: block;
 }
 
-/* 3. 게임 보드 - 높이 짤림 방지 핵심 */
+/* 3. 게임 보드 */
 .game-board {
   flex: 1;
   display: flex;
@@ -77,15 +77,18 @@ h2 {
   opacity: 0.8;
 }
 
+/* 공간이 생길 때 카드가 옆으로 밀리는 현상을 부드럽게 처리 */
 .card-row {
   display: flex;
   justify-content: center;
   gap: 8px;
   height: 85px;
   align-items: center;
+  transition: all 0.3s ease;
+  /* 중요: 새로운 카드가 들어올 때 공간 변화를 부드럽게 */
 }
 
-/* 5. 카드 크기 고정 */
+/* 5. 카드 크기 및 애니메이션 */
 .card {
   width: 55px;
   height: 80px;
@@ -99,8 +102,8 @@ h2 {
   font-size: 18px;
   font-weight: bold;
   box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
-  /* --- 추가된 애니메이션 속성 --- */
-  animation: card-fall 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  /* 등장 속도를 0.3s로 더 민첩하게 변경 */
+  animation: card-fall 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   opacity: 0;
   backface-visibility: hidden;
 }
@@ -113,7 +116,7 @@ h2 {
   color: #2d3436;
 }
 
-/* 6. 트럼프 뒷면 디자인 (사선 패턴) */
+/* 6. 트럼프 뒷면 디자인 */
 .card-placeholder {
   width: 55px;
   height: 80px;
@@ -126,21 +129,18 @@ h2 {
   background-size: 10px 10px;
   border: 2px solid white;
   border-radius: 6px;
-  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
-  /* --- 추가된 애니메이션 속성 --- */
-  animation: card-fall 0.5s ease-out forwards;
+  animation: card-fall 0.4s ease-out forwards;
 }
 
 /* 7. 승자 강조 */
 .winner-border {
   outline: 3px solid #f1c40f;
   background: rgba(241, 196, 15, 0.1) !important;
-  /* --- 추가된 애니메이션 속성 --- */
   animation: gold-pulse 1.5s infinite;
   transition: all 0.3s ease;
 }
 
-/* 8. 텍스트 정보 압축 */
+/* 8. 텍스트 정보 */
 .hand-name {
   height: 30px;
   margin-top: 5px;
@@ -152,7 +152,7 @@ h2 {
   font-weight: bold;
 }
 
-/* 9. 구분선 최소화 */
+/* 9. 구분선 */
 .divider {
   display: flex;
   align-items: center;
@@ -171,13 +171,14 @@ h2 {
 }
 
 /* -------------------------------------------------- */
-/* --- 새로 추가된 애니메이션 키프레임 (CSS 하단) --- */
+/* --- 애니메이션 키프레임 --- */
 /* -------------------------------------------------- */
 
 @keyframes card-fall {
   0% {
     opacity: 0;
-    transform: translateY(-30px) rotateY(90deg) scale(0.8);
+    transform: translateY(-20px) rotateY(45deg) scale(0.9);
+    /* 시작 높이를 낮춰서 더 빨리 떨어지게 */
   }
 
   100% {
@@ -187,20 +188,22 @@ h2 {
 }
 
 @keyframes gold-pulse {
-  0% {
+
+  0%,
+  100% {
     box-shadow: 0 0 5px #f1c40f;
   }
 
   50% {
     box-shadow: 0 0 25px #f1c40f;
   }
-
-  100% {
-    box-shadow: 0 0 5px #f1c40f;
-  }
 }
 
-/* 순차적 등장을 위한 기본 딜레이 (필요시 App.jsx에서 인라인으로 조절 가능) */
+/* -------------------------------------------------- */
+/* --- 순차적 등장 딜레이 수정 (Turn, River 속도 개선) --- */
+/* -------------------------------------------------- */
+
+/* Flop (1, 2, 3번째 카드) */
 .card:nth-child(2) {
   animation-delay: 0.1s;
 }
@@ -209,10 +212,9 @@ h2 {
   animation-delay: 0.2s;
 }
 
-.card:nth-child(4) {
-  animation-delay: 0.3s;
-}
-
+/* Turn & River (4, 5번째 카드) */
+/* 0.3s -> 0.05s로 줄여서 공간이 생김과 거의 동시에 나타나도록 수정 */
+.card:nth-child(4),
 .card:nth-child(5) {
-  animation-delay: 0.4s;
+  animation-delay: 0.05s !important;
 }

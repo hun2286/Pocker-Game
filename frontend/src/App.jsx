@@ -7,20 +7,29 @@ function App() {
   const [phase, setPhase] = useState("waiting");
   const [loading, setLoading] = useState(false);
 
-  // 1. 카드 렌더링 함수 (isCommunity 파라미터 추가)
+  /// 1. 카드 렌더링 함수 (딜레이 로직 최적화)
   const renderCard = (card, index, isCommunity = false) => {
     if (!card) return null;
     const isRed = ['♥', '♦'].includes(card.suit);
 
-    // 공통 카드는 여러 장이 동시에 나타나므로 순차적인 느낌을 위해 0.15초씩 딜레이 부여
-    // 내 카드나 딜러 카드는 기본적으로 2장이므로 0.1초 정도의 짧은 간격 부여
-    const delay = isCommunity ? index * 0.15 : index * 0.1;
+    // 핵심 수정: 새로 추가되는 카드(Turn, River)는 대기 시간 없이 즉시 등장하도록 설정
+    let delay = 0;
+    if (isCommunity) {
+      // Flop(0,1,2번 인덱스)일 때는 0.1s 간격으로 순차 등장
+      // Turn(3번), River(4번)는 인덱스 누적 없이 0.05s만 대기
+      delay = index < 3 ? index * 0.1 : 0.05;
+    } else {
+      // 플레이어/딜러 핸드는 2장이므로 짧은 간격 유지
+      delay = index * 0.1;
+    }
 
     return (
       <div
-        key={`${card.rank}${card.suit}-${index}`}
+        // key 값에서 index를 제거하면 리액트가 기존 카드를 재사용하므로 
+        // 이미 깔린 카드는 애니메이션이 다시 실행되지 않습니다.
+        key={`${card.rank}${card.suit}`}
         className={`card ${isRed ? 'red' : 'black'}`}
-        style={{ animationDelay: `${delay}s` }} // CSS 애니메이션 딜레이를 인라인 스타일로 주입
+        style={{ animationDelay: `${delay}s` }}
       >
         <span className="rank">{card.rank}</span>
         <span className="suit">{card.suit}</span>
