@@ -61,7 +61,11 @@ function App() {
           <div className="card-row">
             {phase === "showdown" && gameData?.dealer_hand ?
               gameData.dealer_hand.map((card, i) =>
-                renderCard(card, i, false, isCardInBestHand(card, gameData?.dealer_best_cards))
+                // 수정: 쇼다운 상태 + 승자가 dealer일 때만 하이라이트
+                renderCard(
+                  card, i, false,
+                  phase === "showdown" && gameData.winner === 'dealer' && isCardInBestHand(card, gameData?.dealer_best_cards)
+                )
               ) : (
                 <>
                   <div className="card-placeholder" style={{ animationDelay: '0s' }}></div>
@@ -80,9 +84,14 @@ function App() {
         <div className="section community-section">
           <div className="card-row">
             {gameData?.community_cards?.map((card, i) => {
-              const bestCards = gameData.winner === 'player' ? gameData.player_best_cards : gameData.dealer_best_cards;
-              // 이미 showdown 조건이 잘 붙어있습니다.
-              return renderCard(card, i, true, phase === "showdown" && isCardInBestHand(card, bestCards));
+              // 승자가 누구냐에 따라 비교할 리스트 선택
+              const winnerCards = gameData.winner === 'player' ? gameData.player_best_cards : gameData.dealer_best_cards;
+
+              // 수정: 쇼다운 상태 + 승자가 존재할 때만 해당 승자의 족보 카드 하이라이트
+              return renderCard(
+                card, i, true,
+                phase === "showdown" && !!gameData.winner && isCardInBestHand(card, winnerCards)
+              );
             })}
           </div>
         </div>
@@ -94,8 +103,11 @@ function App() {
           <h2>Your Hand</h2>
           <div className="card-row">
             {gameData?.player_hand?.map((card, i) =>
-              // [중요 수정]: phase === "showdown" 조건을 추가하여 마지막에만 빛나도록 설정
-              renderCard(card, i, false, phase === "showdown" && isCardInBestHand(card, gameData?.player_best_cards))
+              // 수정: 쇼다운 상태 + 승자가 player일 때만 하이라이트
+              renderCard(
+                card, i, false,
+                phase === "showdown" && gameData.winner === 'player' && isCardInBestHand(card, gameData?.player_best_cards)
+              )
             )}
           </div>
           <div className={`hand-name ${phase === "showdown" && gameData?.winner === 'player' ? 'active' : ''}`}>
