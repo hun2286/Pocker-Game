@@ -55,15 +55,21 @@ def evaluate_hand(cards):
                 "name": "로열 스트레이트 플러시" if is_royal else "스트레이트 플러시",
                 "score": 10 if is_royal else 9,
                 "cards": sf_cards[:5],
+                "power": sf_cards[0]["value"],  # 가장 높은 숫자
             }
 
-    # 3-2. 포카드 (4장)
+    # 3-2. 포카드
     for r, count in rank_counts.items():
         if count == 4:
             four_kind = [c for c in cards if c["value"] == r]
-            return {"name": "포카드", "score": 8, "cards": four_kind}
+            return {
+                "name": "포카드",
+                "score": 8,
+                "cards": four_kind,
+                "power": r,
+            }
 
-    # 3-3. 풀하우스 (3장 + 2장 = 5장)
+    # 3-3. 풀하우스
     three_rank = [r for r, count in rank_counts.items() if count == 3]
     pair_rank = [r for r, count in rank_counts.items() if count >= 2]
     if three_rank and len(pair_rank) > 1:
@@ -72,45 +78,72 @@ def evaluate_hand(cards):
         best_cards = [c for c in cards if c["value"] == t_rank] + [
             c for c in cards if c["value"] == p_rank
         ][:2]
-        return {"name": "풀하우스", "score": 7, "cards": best_cards}
+        return {
+            "name": "풀하우스",
+            "score": 7,
+            "cards": best_cards,
+            "power": t_rank,
+        }
 
-    # 3-4. 플러시 (5장)
+    # 3-4. 플러시
     if flush_suit:
         f_cards = sorted(
             [c for c in cards if c["suit"] == flush_suit],
             key=lambda x: x["value"],
             reverse=True,
         )
-        return {"name": "플러시", "score": 6, "cards": f_cards[:5]}
+        return {
+            "name": "플러시",
+            "score": 6,
+            "cards": f_cards[:5],
+            "power": f_cards[0]["value"],
+        }
 
-    # 3-5. 스트레이트 (5장)
+    # 3-5. 스트레이트
     st_cards = get_straight_cards(cards)
     if st_cards:
-        return {"name": "스트레이트", "score": 5, "cards": st_cards}
+        return {
+            "name": "스트레이트",
+            "score": 5,
+            "cards": st_cards,
+            "power": st_cards[0]["value"],
+        }
 
-    # 3-6. 트리플 (3장)
+    # 3-6. 트리플
     if 3 in rank_counts.values():
         t_rank = max([r for r, count in rank_counts.items() if count == 3])
         return {
             "name": "트리플",
             "score": 4,
             "cards": [c for c in cards if c["value"] == t_rank],
+            "power": t_rank,
         }
 
-    # 3-7. 투페어 (4장)
+    # 3-7. 투페어
     pairs = sorted([r for r, count in rank_counts.items() if count == 2], reverse=True)
     if len(pairs) >= 2:
         best_cards = [c for c in cards if c["value"] in pairs[:2]]
-        return {"name": "투페어", "score": 3, "cards": best_cards}
+        return {
+            "name": "투페어",
+            "score": 3,
+            "cards": best_cards,
+            "power": pairs[0],
+        }
 
-    # 3-8. 원페어 (2장)
+    # 3-8. 원페어
     if 2 in rank_counts.values():
         p_rank = max([r for r, count in rank_counts.items() if count == 2])
         return {
             "name": "원페어",
             "score": 2,
             "cards": [c for c in cards if c["value"] == p_rank],
+            "power": p_rank,
         }
 
-    # 3-9. 하이카드 (1장)
-    return {"name": "하이카드", "score": 1, "cards": [sorted_cards[0]]}
+    # 3-9. 하이카드
+    return {
+        "name": "하이카드",
+        "score": 1,
+        "cards": [sorted_cards[0]],
+        "power": sorted_cards[0]["value"],
+    }
