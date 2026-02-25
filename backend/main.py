@@ -14,31 +14,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 게임 상태 관리 (딜러 자산 및 배팅 단위 설정)
+# 1. 게임의 '태초 상태'를 상수로 보관 (리셋 시 사용)
+INITIAL_STATE = {
+    "player_money": 1000,
+    "dealer_money": 1000,
+    "ante": 50,
+    "call_bet": 50,
+}
+
+# 2. 실시간 게임 상태
 game_state = {
     "deck": [],
     "player_hand": [],
     "dealer_hand": [],
     "community_cards": [],
     "phase": "waiting",
-    "player_money": 1000,
-    "dealer_money": 1000,
     "pot": 0,
-    "ante": 50,  # 시작 참가비
-    "call_bet": 50,  # 단계별 추가 배팅액
+    **INITIAL_STATE,  # 초기값 언패킹
 }
 
 
 @app.get("/start")
 def start_game():
-    # 양쪽 모두 참가비(Ante)가 있는지 확인
+    # 시작 전 자금 체크 (파산 상태면 시작 불가)
     if (
         game_state["player_money"] < game_state["ante"]
         or game_state["dealer_money"] < game_state["ante"]
     ):
-        return {"error": "자금이 부족하여 게임을 시작할 수 없습니다!"}
+        return {
+            "error": "자금이 부족하여 게임을 시작할 수 없습니다!",
+            "is_game_over": True,
+        }
 
-    # 참가비 차감 (각 50원씩 총 100원 팟 형성)
+    # 참가비 차감
     game_state["player_money"] -= game_state["ante"]
     game_state["dealer_money"] -= game_state["ante"]
     game_state["pot"] = game_state["ante"] * 2
@@ -51,7 +59,6 @@ def start_game():
     game_state["phase"] = "pre-flop"
 
     p_res = evaluate_hand(game_state["player_hand"])
-
     return {
         "phase": game_state["phase"],
         "player_hand": game_state["player_hand"],
@@ -69,20 +76,19 @@ def next_phase():
     phase = game_state["phase"]
     deck = game_state["deck"]
 
-    # 쇼다운 이전 단계(flop, turn, river로 넘어갈 때)라면 추가 배팅 발생
+    # 배팅 로직
     if phase in ["pre-flop", "flop", "turn"]:
         if (
             game_state["player_money"] < game_state["call_bet"]
             or game_state["dealer_money"] < game_state["call_bet"]
         ):
-            # 돈이 모자라면 배팅 없이 카드만 오픈 (올인 상황 처리로 확장 가능)
             pass
         else:
             game_state["player_money"] -= game_state["call_bet"]
             game_state["dealer_money"] -= game_state["call_bet"]
             game_state["pot"] += game_state["call_bet"] * 2
 
-    # 단계별 카드 추가
+    # 카드 오픈 로직
     if phase == "pre-flop":
         game_state["community_cards"] += [deck.pop() for _ in range(3)]
         game_state["phase"] = "flop"
@@ -93,7 +99,6 @@ def next_phase():
         game_state["community_cards"].append(deck.pop())
         game_state["phase"] = "river"
     elif phase == "river":
-        # 최종 결과 판정 및 정산
         p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
         d_res = evaluate_hand(game_state["dealer_hand"] + game_state["community_cards"])
         winner = determine_winner(p_res, d_res)
@@ -110,6 +115,11 @@ def next_phase():
         current_pot = game_state["pot"]
         game_state["pot"] = 0
 
+        # 쇼다운 결과 정산 후 파산 여부 체크
+        is_game_over = (
+            game_state["player_money"] <= 0 or game_state["dealer_money"] <= 0
+        )
+
         return {
             "phase": "showdown",
             "community_cards": game_state["community_cards"],
@@ -123,6 +133,7 @@ def next_phase():
             "player_money": game_state["player_money"],
             "dealer_money": game_state["dealer_money"],
             "pot": current_pot,
+            "is_game_over": is_game_over,  # 파산 여부 전달
         }
 
     p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
@@ -140,14 +151,28 @@ def next_phase():
 
 @app.post("/fold")
 def fold_game():
-    # 기권 시 현재까지 쌓인 판돈은 모두 딜러가 가져감
     game_state["dealer_money"] += game_state["pot"]
     game_state["pot"] = 0
     game_state["phase"] = "waiting"
+
+    # 폴드 직후에도 파산 여부 체크 (플레이어 돈이 0일 수 있음)
+    is_game_over = game_state["player_money"] <= 0 or game_state["dealer_money"] <= 0
 
     return {
         "phase": "waiting",
         "player_money": game_state["player_money"],
         "dealer_money": game_state["dealer_money"],
         "pot": 0,
+        "is_game_over": is_game_over,
     }
+
+
+# 파산 시 모든 자금을 1000으로 리셋하는 API
+@app.post("/reset")
+def reset_game():
+    game_state["player_money"] = 1000
+    game_state["dealer_money"] = 1000
+    game_state["pot"] = 0
+    game_state["phase"] = "waiting"
+    game_state["community_cards"] = []
+    return {"message": "Game Reset Success", "player_money": 1000, "dealer_money": 1000}
