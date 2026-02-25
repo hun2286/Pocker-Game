@@ -70,12 +70,18 @@ function App() {
 
   return (
     <div className="poker-app">
-      {/* 1. 상단 자산 표시 바 */}
+      {/* 상단 자산 표시 바 */}
       <div className="status-bar">
-        <div className="money-item">My Money: <span>${gameData?.player_money ?? 1000}</span></div>
-        <div className="money-item">Pot: <span className="pot-text">${gameData?.pot ?? 0}</span></div>
+        <div className="money-item dealer">
+          Dealer: <span>${gameData?.dealer_money ?? 1000}</span>
+        </div>
+        <div className="money-item pot">
+          Pot: <span className="pot-text">${gameData?.pot ?? 0}</span>
+        </div>
+        <div className="money-item player">
+          You: <span>${gameData?.player_money ?? 1000}</span>
+        </div>
       </div>
-
       <h1>Texas Hold'em Table</h1>
 
       <div className="game-board">
@@ -93,7 +99,7 @@ function App() {
           <div className="hand-name">{phase === "showdown" && gameData?.dealer_best}</div>
         </div>
 
-        <div className="divider">Community Cards</div>
+        <div className="divider"></div>
 
         {/* 공통 카드 섹션 */}
         <div className="section community-section">
@@ -108,7 +114,7 @@ function App() {
           </div>
         </div>
 
-        <div className="divider">Your Hand</div>
+        <div className="divider"></div>
 
         {/* 플레이어 섹션 */}
         <div className={`section player-section ${phase === 'showdown' && gameData?.winner === 'player' ? 'winner-border' : ''}`}>
@@ -125,16 +131,21 @@ function App() {
         </div>
       </div>
 
-      {/* 하단 컨트롤 버튼 */}
+      {/* 2. 하단 컨트롤 버튼 */}
       <div className="controls">
         {phase === "waiting" || phase === "showdown" ? (
           <button className="btn btn-start" onClick={handleGameAction} disabled={loading}>
-            {phase === "showdown" ? "New Game ($100)" : "Start Game ($100)"}
+            {phase === "showdown" ? "New Game ($-50)" : "Start Game ($-50)"}
           </button>
         ) : (
           <div className="action-group">
-            <button className="btn btn-fold" onClick={handleFold} disabled={loading}>Fold</button>
-            <button className="btn btn-call" onClick={handleGameAction} disabled={loading}>Call</button>
+            <button className="btn btn-fold" onClick={handleFold} disabled={loading}>
+              Fold (기권)
+            </button>
+            <button className="btn btn-call" onClick={handleGameAction} disabled={loading}>
+              {/* 리버 단계 이후에는 돈을 더 내지 않고 결과만 확인 */}
+              {phase === "river" ? "Check Result" : "Call ($-50)"}
+            </button>
           </div>
         )}
       </div>
