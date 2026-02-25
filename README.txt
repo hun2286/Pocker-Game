@@ -42,6 +42,7 @@ frontend/: React 기반 UI 및 프론트엔드 상태 관리
 backend/: FastAPI 기반 API 서버 및 게임 상태 제어
 
 modules/: 게임 핵심 엔진
+
     cards.py: 덱 생성 및 카드 분배
 
     evaluator.py: 족보 분석 및 랭킹 계산
@@ -53,4 +54,4 @@ modules/: 게임 핵심 엔진
 
 확률 엔진: 현재 핸드 기준 특정 족보 완성 확률 실시간 시각화
 
-지능형 AI: 딜러의 승률 분석을 통한 유동적인 배팅(Raise/Fold/Bluffing) 로직 구현
+지능형 AI: 딜러의 승률 분석을 통한 유동적인 배팅 로직 구현
