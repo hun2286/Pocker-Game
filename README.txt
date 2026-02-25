@@ -42,7 +42,6 @@ frontend/: React 기반 UI 및 프론트엔드 상태 관리
 backend/: FastAPI 기반 API 서버 및 게임 상태 제어
 
 modules/: 게임 핵심 엔진
-
     cards.py: 덱 생성 및 카드 분배
 
     evaluator.py: 족보 분석 및 랭킹 계산
