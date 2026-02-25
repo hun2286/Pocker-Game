@@ -43,11 +43,11 @@ backend/: FastAPI 기반 API 서버 및 게임 상태 제어
 
 modules/: 게임 핵심 엔진
 
-cards.py: 덱 생성 및 카드 분배
+    cards.py: 덱 생성 및 카드 분배
 
-evaluator.py: 족보 분석 및 랭킹 계산
+    evaluator.py: 족보 분석 및 랭킹 계산
 
-game_engine.py: 승패 판정 및 자금 정산 로직
+    game_engine.py: 승패 판정 및 자금 정산 로직
 
 💡 향후 개선 사항 (Next Steps)
 멀티미디어: 카드 딜링 효과음 및 승리 시 칩 쏟아지는 사운드 추가
