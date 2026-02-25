@@ -7,19 +7,12 @@ function App() {
   const [phase, setPhase] = useState("waiting");
   const [loading, setLoading] = useState(false);
 
-  // 카드 비교 함수 (rank와 suit가 모두 같아야 함)
+  // 카드 비교 함수 (통일된 cards 리스트 사용)
   const isCardInBestHand = (card, bestCards) => {
     if (!card || !bestCards) return false;
     return bestCards.some(bc => bc.rank === card.rank && bc.suit === card.suit);
   };
 
-  /**
-   * 카드 렌더링 함수
-   * @param {Object} card - 카드 정보
-   * @param {number} index - 애니메이션 딜레이용 인덱스
-   * @param {boolean} isCommunity - 공통 카드 여부
-   * @param {boolean} isHighlight - 족보 하이라이트 여부
-   */
   const renderCard = (card, index, isCommunity = false, isHighlight = false) => {
     if (!card) return null;
     const isRed = ['♥', '♦'].includes(card.suit);
@@ -37,20 +30,39 @@ function App() {
     );
   };
 
+  // 게임 진행 및 Call 버튼 역할
   const handleGameAction = async () => {
     setLoading(true);
-    // 쇼다운이거나 대기 중이면 새 게임 시작, 아니면 다음 단계로
     const url = (phase === "waiting" || phase === "showdown")
       ? 'http://localhost:8000/start'
       : 'http://localhost:8000/next';
 
     try {
       const response = await axios.get(url);
-      setGameData(response.data);
-      setPhase(response.data.phase);
+      if (response.data.error) {
+        alert(response.data.error);
+      } else {
+        setGameData(response.data);
+        setPhase(response.data.phase);
+      }
     } catch (error) {
       console.error("연결 실패:", error);
-      alert("서버 연결에 실패했습니다!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 기권 (Fold) 함수
+  const handleFold = async () => {
+    // if (!window.confirm("...")) 로직을 삭제하여 즉시 실행되게 합니다.
+    setLoading(true);
+    try {
+      const response = await axios.post('http://localhost:8000/fold');
+      setGameData(response.data);
+      setPhase(response.data.phase);
+      // alert("기권하셨습니다."); // 알림창 제거
+    } catch (error) {
+      console.error("Fold 실패:", error);
     } finally {
       setLoading(false);
     }
@@ -58,66 +70,73 @@ function App() {
 
   return (
     <div className="poker-app">
+      {/* 1. 상단 자산 표시 바 */}
+      <div className="status-bar">
+        <div className="money-item">My Money: <span>${gameData?.player_money ?? 1000}</span></div>
+        <div className="money-item">Pot: <span className="pot-text">${gameData?.pot ?? 0}</span></div>
+      </div>
+
       <h1>Texas Hold'em Table</h1>
-      <button className="deal-button" onClick={handleGameAction} disabled={loading}>
-        {loading ? "..." : (phase === "waiting" || phase === "showdown" ? "New Game" : "Next Card")}
-      </button>
 
       <div className="game-board">
-        {/* 1. 딜러 섹션 */}
+        {/* 딜러 섹션 */}
         <div className={`section dealer-section ${phase === "showdown" && gameData?.winner === 'dealer' ? 'winner-border' : ''}`}>
           <h2>Dealer Hand</h2>
           <div className="card-row">
             {phase === "showdown" && gameData?.dealer_hand ?
               gameData.dealer_hand.map((card, i) => renderCard(
                 card, i, false,
-                // 조건: 쇼다운 단계에서 + 딜러가 승자일 때만 하이라이트
-                phase === "showdown" && gameData.winner === 'dealer' && isCardInBestHand(card, gameData.dealer_best_cards)
+                gameData.winner === 'dealer' && isCardInBestHand(card, gameData.dealer_best_cards)
               ))
               : <><div className="card-placeholder"></div><div className="card-placeholder"></div></>}
           </div>
-          <div className={`hand-name ${phase === "showdown" ? 'active' : ''}`}>
-            {phase === "showdown" && gameData?.dealer_best}
-          </div>
+          <div className="hand-name">{phase === "showdown" && gameData?.dealer_best}</div>
         </div>
 
         <div className="divider">Community Cards</div>
 
-        {/* 2. 공통 카드 섹션 */}
+        {/* 공통 카드 섹션 */}
         <div className="section community-section">
           <div className="card-row">
             {gameData?.community_cards?.map((card, i) => {
-              // 쇼다운일 때만 현재 승자의 족보 카드를 가져와서 비교
               const isShowdown = phase === "showdown";
               const bestCards = isShowdown
                 ? (gameData.winner === 'dealer' ? gameData.dealer_best_cards : gameData.player_best_cards)
                 : [];
-
-              return renderCard(
-                card, i, true,
-                isShowdown && isCardInBestHand(card, bestCards)
-              );
+              return renderCard(card, i, true, isShowdown && isCardInBestHand(card, bestCards));
             })}
           </div>
         </div>
 
         <div className="divider">Your Hand</div>
 
-        {/* 3. 플레이어 섹션 */}
+        {/* 플레이어 섹션 */}
         <div className={`section player-section ${phase === 'showdown' && gameData?.winner === 'player' ? 'winner-border' : ''}`}>
           <h2>Your Hand</h2>
           <div className="card-row">
             {gameData?.player_hand?.map((card, i) => renderCard(
               card, i, false,
-              // 조건: 쇼다운 단계에서 + 플레이어가 승자일 때만 하이라이트
               phase === "showdown" && gameData.winner === 'player' && isCardInBestHand(card, gameData.player_best_cards)
             ))}
           </div>
           <div className={`hand-name ${phase === "showdown" ? 'active' : ''}`}>
-            {/* 플레이어 족보 이름은 진행 중에도 볼 수 있게 하거나, 쇼다운 때만 보이게 조절 가능 */}
-            {gameData?.player_best && (phase === "showdown" ? `Result: ${gameData.player_best}` : `Current: ${gameData.player_best}`)}
+            {gameData?.player_best}
           </div>
         </div>
+      </div>
+
+      {/* 하단 컨트롤 버튼 */}
+      <div className="controls">
+        {phase === "waiting" || phase === "showdown" ? (
+          <button className="btn btn-start" onClick={handleGameAction} disabled={loading}>
+            {phase === "showdown" ? "New Game ($100)" : "Start Game ($100)"}
+          </button>
+        ) : (
+          <div className="action-group">
+            <button className="btn btn-fold" onClick={handleFold} disabled={loading}>Fold</button>
+            <button className="btn btn-call" onClick={handleGameAction} disabled={loading}>Call</button>
+          </div>
+        )}
       </div>
     </div>
   );

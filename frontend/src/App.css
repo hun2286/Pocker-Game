@@ -22,8 +22,36 @@ body {
   height: 98vh;
   display: flex;
   flex-direction: column;
-  padding: 5px;
+  padding: 10px;
   box-sizing: border-box;
+}
+
+/* 2. 자산 표시 바 */
+.status-bar {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 12px;
+  border-radius: 50px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.money-item {
+  font-size: 1.1rem;
+  color: #bdc3c7;
+}
+
+.money-item span {
+  color: #ffffff;
+  font-weight: bold;
+  margin-left: 8px;
+}
+
+.pot-text {
+  color: #f1c40f !important;
+  text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
 }
 
 h1 {
@@ -36,45 +64,32 @@ h1 {
   color: #f1c40f;
 }
 
-/* 2. 버튼 높이 최적화 */
-.deal-button {
-  padding: 8px 20px;
-  font-size: 15px;
-  font-weight: bold;
-  cursor: pointer;
-  background-color: #f39c12;
-  color: white;
-  border: none;
-  border-radius: 20px;
-  margin: 5px auto;
-  height: 35px;
-  display: block;
-}
-
 /* 3. 게임 보드 */
 .game-board {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   justify-content: flex-start;
 }
 
-/* 4. 섹션 높이 압축 */
+/* 4. 섹션 설정 */
 .section {
-  padding: 20px;
+  padding: 15px;
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.25);
-  min-height: 120px;
+  min-height: 110px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
 h2 {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   margin: 0 0 5px 0;
   opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .card-row {
@@ -86,7 +101,7 @@ h2 {
   transition: all 0.3s ease;
 }
 
-/* 5. 카드 크기 및 애니메이션 */
+/* 5. 카드 디자인 및 애니메이션 */
 .card {
   width: 55px;
   height: 80px;
@@ -113,7 +128,6 @@ h2 {
   color: #2d3436;
 }
 
-/* 6. 트럼프 뒷면 디자인 */
 .card-placeholder {
   width: 55px;
   height: 80px;
@@ -124,44 +138,48 @@ h2 {
     linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.1) 75%),
     linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.1) 75%);
   background-size: 10px 10px;
-  border: 2px solid white;
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 6px;
-  animation: card-fall 0.4s ease-out forwards;
 }
 
-/* 7. 승자 강조 */
+/* 6. 승자 및 하이라이트 */
 .winner-border {
   outline: 3px solid #f1c40f;
   background: rgba(241, 196, 15, 0.1) !important;
   animation: gold-pulse 1.5s infinite;
-  transition: all 0.3s ease;
 }
 
-/* 8. 텍스트 정보 */
+.card.highlight {
+  z-index: 10;
+  transform: translateY(-12px) scale(1.1);
+  box-shadow: 0 0 20px #f1c40f;
+  border: 2px solid #f1c40f !important;
+  background: white !important;
+}
+
 .hand-name {
-  height: 30px;
+  height: 25px;
   margin-top: 5px;
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: #f1c40f;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  transition: all 0.3s ease;
 }
 
 .hand-name.active {
   color: #fff;
-  text-shadow: 0 0 10px #f1c40f, 0 0 20px #f39c12;
+  text-shadow: 0 0 10px #f1c40f;
   transform: scale(1.1);
 }
 
-/* 9. 구분선 */
+/* 7. 구분선 */
 .divider {
   display: flex;
   align-items: center;
-  color: rgba(255, 255, 255, 0.3);
-  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 0.65rem;
   margin: 2px 0;
 }
 
@@ -174,17 +192,85 @@ h2 {
   margin: 0 10px;
 }
 
-/* 10. 족보 하이라이트 효과 (통합 버전) */
-/* 10. 족보 하이라이트 효과 */
-.card.highlight {
-  z-index: 10;
-  transform: translateY(-12px) scale(1.1);
-  box-shadow: 0 0 20px #f1c40f;
-  border: 2px solid #f1c40f !important;
-  background: white !important;
+/* 8. 컨트롤 버튼 (Controls) - 좌우 배치 강제 */
+.controls {
+  margin-top: auto;
+  padding-bottom: 30px;
+  display: flex;
+  flex-direction: row;
+  /* 좌우 배치를 명시 */
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  /* 버튼 사이 여유 공간 20px */
+  width: 100%;
+  /* 부모 너비를 꽉 채워 정렬 기준 확보 */
 }
 
-/* --- 애니메이션 키프레임 --- */
+/* 개별 버튼 그룹 (두 버튼을 감싸는 div가 있다면 적용) */
+.action-group {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  width: 100%;
+}
+
+.btn {
+  /* 버튼 크기를 큼직하게 통일 */
+  width: 180px;
+  height: 55px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  border-radius: 12px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+
+  /* 내부 텍스트 중앙 정렬 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* 버튼이 압축되지 않도록 설정 */
+  flex-shrink: 0;
+}
+
+.btn-start {
+  background: #27ae60;
+  color: white;
+  width: 250px;
+  /* 시작 버튼만 더 넓게 */
+}
+
+.btn-call {
+  background: #2980b9;
+  color: white;
+}
+
+.btn-fold {
+  background: #c0392b;
+  color: white;
+}
+
+/* 호버 및 액티브 효과 */
+.btn:hover:not(:disabled) {
+  transform: translateY(-3px);
+  filter: brightness(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.btn:active {
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  background: #7f8c8d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 9. 애니메이션 키프레임 */
 @keyframes card-fall {
   0% {
     opacity: 0;
@@ -205,11 +291,10 @@ h2 {
   }
 
   50% {
-    box-shadow: 0 0 25px #f1c40f;
+    box-shadow: 0 0 20px #f1c40f;
   }
 }
 
-/* Flop/Turn/River 딜레이 */
 .card:nth-child(2) {
   animation-delay: 0.1s;
 }
