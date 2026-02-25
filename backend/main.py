@@ -6,7 +6,6 @@ from modules.game_engine import determine_winner
 
 app = FastAPI()
 
-# 1. CORS 설정: 프론트엔드와 통신 허용
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,8 +14,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 2. 게임 상태 관리 (변수명 고정)
-# player_money: 자산, pot: 판돈, bet_unit: 참가비
+# 게임 상태 관리 (딜러 자산 및 배팅 단위 설정)
 game_state = {
     "deck": [],
     "player_hand": [],
@@ -24,21 +22,27 @@ game_state = {
     "community_cards": [],
     "phase": "waiting",
     "player_money": 1000,
+    "dealer_money": 1000,
     "pot": 0,
-    "bet_unit": 100,
+    "ante": 50,  # 시작 참가비
+    "call_bet": 50,  # 단계별 추가 배팅액
 }
 
 
 @app.get("/start")
 def start_game():
-    # 자산 체크 및 참가비 차감
-    if game_state["player_money"] < game_state["bet_unit"]:
-        return {"error": "잔액이 부족합니다!"}
+    # 양쪽 모두 참가비(Ante)가 있는지 확인
+    if (
+        game_state["player_money"] < game_state["ante"]
+        or game_state["dealer_money"] < game_state["ante"]
+    ):
+        return {"error": "자금이 부족하여 게임을 시작할 수 없습니다!"}
 
-    game_state["player_money"] -= game_state["bet_unit"]
-    game_state["pot"] = game_state["bet_unit"] * 2  # 딜러와 동일 베팅 가정
+    # 참가비 차감 (각 50원씩 총 100원 팟 형성)
+    game_state["player_money"] -= game_state["ante"]
+    game_state["dealer_money"] -= game_state["ante"]
+    game_state["pot"] = game_state["ante"] * 2
 
-    # 덱 생성 및 카드 분배
     deck = create_deck()
     game_state["deck"] = deck
     game_state["player_hand"] = [deck.pop(), deck.pop()]
@@ -46,10 +50,8 @@ def start_game():
     game_state["community_cards"] = []
     game_state["phase"] = "pre-flop"
 
-    # 현재 족보 계산
     p_res = evaluate_hand(game_state["player_hand"])
 
-    # 응답 키값 통일: player_best_cards
     return {
         "phase": game_state["phase"],
         "player_hand": game_state["player_hand"],
@@ -57,6 +59,7 @@ def start_game():
         "player_best": p_res["name"],
         "player_best_cards": p_res["cards"],
         "player_money": game_state["player_money"],
+        "dealer_money": game_state["dealer_money"],
         "pot": game_state["pot"],
     }
 
@@ -65,6 +68,19 @@ def start_game():
 def next_phase():
     phase = game_state["phase"]
     deck = game_state["deck"]
+
+    # 쇼다운 이전 단계(flop, turn, river로 넘어갈 때)라면 추가 배팅 발생
+    if phase in ["pre-flop", "flop", "turn"]:
+        if (
+            game_state["player_money"] < game_state["call_bet"]
+            or game_state["dealer_money"] < game_state["call_bet"]
+        ):
+            # 돈이 모자라면 배팅 없이 카드만 오픈 (올인 상황 처리로 확장 가능)
+            pass
+        else:
+            game_state["player_money"] -= game_state["call_bet"]
+            game_state["dealer_money"] -= game_state["call_bet"]
+            game_state["pot"] += game_state["call_bet"] * 2
 
     # 단계별 카드 추가
     if phase == "pre-flop":
@@ -77,20 +93,22 @@ def next_phase():
         game_state["community_cards"].append(deck.pop())
         game_state["phase"] = "river"
     elif phase == "river":
-        # 최종 쇼다운 판정
+        # 최종 결과 판정 및 정산
         p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
         d_res = evaluate_hand(game_state["dealer_hand"] + game_state["community_cards"])
         winner = determine_winner(p_res, d_res)
         game_state["phase"] = "showdown"
 
-        # 승패 정산
         if winner == "player":
             game_state["player_money"] += game_state["pot"]
+        elif winner == "dealer":
+            game_state["dealer_money"] += game_state["pot"]
         elif winner == "draw":
             game_state["player_money"] += game_state["pot"] // 2
+            game_state["dealer_money"] += game_state["pot"] // 2
 
         current_pot = game_state["pot"]
-        game_state["pot"] = 0  # 정산 후 판돈 초기화
+        game_state["pot"] = 0
 
         return {
             "phase": "showdown",
@@ -103,10 +121,10 @@ def next_phase():
             "player_best_cards": p_res["cards"],
             "dealer_best_cards": d_res["cards"],
             "player_money": game_state["player_money"],
+            "dealer_money": game_state["dealer_money"],
             "pot": current_pot,
         }
 
-    # 중간 단계 응답
     p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
     return {
         "phase": game_state["phase"],
@@ -115,18 +133,21 @@ def next_phase():
         "player_best": p_res["name"],
         "player_best_cards": p_res["cards"],
         "player_money": game_state["player_money"],
+        "dealer_money": game_state["dealer_money"],
         "pot": game_state["pot"],
     }
 
 
 @app.post("/fold")
 def fold_game():
-    # 기권 시 즉시 대기 상태로 전환
+    # 기권 시 현재까지 쌓인 판돈은 모두 딜러가 가져감
+    game_state["dealer_money"] += game_state["pot"]
     game_state["pot"] = 0
     game_state["phase"] = "waiting"
+
     return {
         "phase": "waiting",
         "player_money": game_state["player_money"],
+        "dealer_money": game_state["dealer_money"],
         "pot": 0,
-        "message": "기권하셨습니다.",
     }
