@@ -1,4 +1,4 @@
-🃏 AI-Powered Texas Hold'em Poker Game
+🃏 Texas Hold'em Poker Game
 FastAPI와 React를 기반으로 한 지능형 텍사스 홀덤 포커 게임입니다. 
 도커를 통해 즉시 실행 가능하며, 정교한 승패 판정 로직과 몰입감 있는 시각 연출을 제공합니다.
 
