@@ -176,3 +176,22 @@ def reset_game():
     game_state["phase"] = "waiting"
     game_state["community_cards"] = []
     return {"message": "Game Reset Success", "player_money": 1000, "dealer_money": 1000}
+
+
+# 테스트용: 자금을 강제로 0원으로 만드는 API (확인 후 삭제 권장)
+# @app.post("/test/bankrupt")
+# def test_bankrupt(target: str = "player"):
+#     """
+#     target이 'player'면 플레이어 파산, 'dealer'면 딜러 파산
+#     """
+#     if target == "player":
+#         game_state["player_money"] = 0
+#     else:
+#         game_state["dealer_money"] = 0
+
+#     return {
+#         "message": f"Test: {target} is now bankrupt",
+#         "player_money": game_state["player_money"],
+#         "dealer_money": game_state["dealer_money"],
+#         "is_game_over": True,
+#     }
