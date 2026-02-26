@@ -348,3 +348,17 @@ h2 {
   from { opacity: 0; transform: translateY(50px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* 결과창 내부의 모든 요소를 수직 중앙 정렬 */
+.game-over-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;    /* 가로축 중앙으로 모읍니다. */
+  justify-content: center;
+}
+
+/* 결과창 내 버튼 여백 조정 */
+.game-over-content .btn-start {
+  margin-top: 20px;       /* 위쪽 텍스트와 너무 붙지 않게 여백 추가 */
+  width: 220px;           /* 결과창에 어울리는 적당한 크기 */
+}

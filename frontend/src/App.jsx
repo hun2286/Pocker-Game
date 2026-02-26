@@ -156,13 +156,22 @@ function App() {
       {isGameOver && (
         <div className="game-over-overlay">
           <div className="game-over-content">
-            <h1>{gameData?.player_money <= 0 ? "BANKRUPT" : "CHAMPION!"}</h1>
-            <p>{gameData?.player_money <= 0 ? "모든 자산을 잃었습니다." : "딜러를 파산시켰습니다!"}</p>
-            <div className="final-stats">최종 자산: <span>${gameData?.player_money}</span></div>
-            <button className="btn btn-start" onClick={handleFullReset}>다시 도전하기</button>
+            {/* 텍스트 그룹 */}
+            <div className="game-over-info">
+              <h1>{gameData?.player_money <= 0 ? "GAME OVER" : "CHAMPION!"}</h1>
+              <p>{gameData?.player_money <= 0 ? "모든 자산을 잃었습니다." : "딜러를 파산시켰습니다!"}</p>
+              <div className="final-stats">최종 자산: <span>${gameData?.player_money}</span></div>
+            </div>
+            
+            {/* 버튼 그룹 (CSS에서 정렬하기 쉽도록 분리) */}
+            <div className="game-over-actions">
+              <button className="btn btn-start" onClick={handleFullReset}>
+                          다시 도전하기
+              </button>
+            </div>
           </div>
         </div>
-      )}
+)}
     </div>
   );
 }
