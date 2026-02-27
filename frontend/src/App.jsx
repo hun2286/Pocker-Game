@@ -17,7 +17,7 @@ function App() {
   // 딜러의 상태 메시지 (말풍선용)
   const [dealerMsg, setDealerMsg] = useState("");
 
-  // [추가] 앱이 로드되거나 새로고침될 때 백엔드 자산을 강제로 리셋하는 로직
+  // 앱 로드 시 백엔드 자산 리셋
   useEffect(() => {
     const initGame = async () => {
       try {
@@ -61,7 +61,7 @@ function App() {
 
   const handleStartGame = async () => {
     setLoading(true);
-    setDealerMsg(""); // 메시지 초기화
+    setDealerMsg("");
     try {
       const response = await api.get("/start");
       if (response.data.error) {
@@ -81,8 +81,7 @@ function App() {
 
   const handlePlayerAction = async (actionType) => {
     setLoading(true);
-    setDealerMsg("Thinking..."); // 딜러가 고민 중임을 표시
-
+    setDealerMsg("Thinking...");
     try {
       const response = await api.get(
         `/next?action=${actionType}&bet=${betAmount}`,
@@ -94,12 +93,9 @@ function App() {
         setGameData(response.data);
         setPhase(response.data.phase);
         setIsBetting(false);
-
-        // 백엔드에서 온 딜러의 액션을 말풍선에 설정
         if (response.data.dealer_action) {
           setDealerMsg(response.data.dealer_action);
         }
-
         if (response.data.is_game_over) setIsGameOver(true);
       }
     } catch (error) {
@@ -159,43 +155,51 @@ function App() {
         <div
           className={`section dealer-section ${phase === "showdown" && gameData?.winner === "dealer" ? "winner-border" : ""}`}
         >
-          {/* 1. 제목 */}
           <h2>Dealer Hand</h2>
 
-          {/* 2. 카드 영역 */}
-          <div className="card-row">
-            {phase === "showdown" && gameData?.dealer_hand ? (
-              gameData.dealer_hand.map((card, i) =>
-                renderCard(
-                  card,
-                  i,
-                  false,
-                  gameData.winner === "dealer" &&
-                    isCardInBestHand(card, gameData.dealer_best_cards),
-                ),
-              )
-            ) : (
-              <>
-                <div className="card-placeholder"></div>
-                <div className="card-placeholder"></div>
-              </>
-            )}
+          {/* 말풍선을 왼쪽으로 빼기 위한 래퍼 추가 */}
+          <div className="card-area-wrapper">
+            {/* 왼쪽 메시지 공간 */}
+            <div className="dealer-action-aside">
+              {dealerMsg && phase !== "showdown" && (
+                <div
+                  className={`dealer-bubble-side ${dealerMsg.toLowerCase()}`}
+                >
+                  {dealerMsg}
+                </div>
+              )}
+            </div>
+
+            {/* 중앙 카드 로우 */}
+            <div className="card-row">
+              {phase === "showdown" && gameData?.dealer_hand ? (
+                gameData.dealer_hand.map((card, i) =>
+                  renderCard(
+                    card,
+                    i,
+                    false,
+                    gameData.winner === "dealer" &&
+                      isCardInBestHand(card, gameData.dealer_best_cards),
+                  ),
+                )
+              ) : (
+                <>
+                  <div className="card-placeholder"></div>
+                  <div className="card-placeholder"></div>
+                </>
+              )}
+            </div>
+
+            {/* 대칭을 위한 오른쪽 빈 공간 */}
+            <div className="dealer-action-aside"></div>
           </div>
 
-          {/* 3. 딜러 메시지 영역 (카드 바로 밑) */}
           <div className="dealer-status-container">
-            {/* phase가 showdown이 아닐 때만 딜러의 액션 메시지(말풍선)를 보여줍니다. */}
-            {dealerMsg && phase !== "showdown" ? (
-              <div className={`dealer-bubble ${dealerMsg.toLowerCase()}`}>
-                {dealerMsg}
-              </div>
-            ) : (
-              <div
-                className={`hand-name ${phase === "showdown" ? "active" : ""}`}
-              >
-                {phase === "showdown" ? gameData?.dealer_best : ""}
-              </div>
-            )}
+            <div
+              className={`hand-name ${phase === "showdown" ? "active" : ""}`}
+            >
+              {phase === "showdown" ? gameData?.dealer_best : ""}
+            </div>
           </div>
         </div>
 
