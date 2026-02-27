@@ -2,7 +2,6 @@ import { useState } from 'react';
 import axios from 'axios';
 import './App.css';
 
-// axios 인스턴스 생성 (API 주소 통합 관리)
 const api = axios.create({
   baseURL: 'http://localhost:8000',
 });
@@ -12,8 +11,11 @@ function App() {
   const [phase, setPhase] = useState("waiting");
   const [loading, setLoading] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
+  const [betAmount, setBetAmount] = useState(50);
+  
+  // 1. Raise 모드 활성화 상태 추가
+  const [isBetting, setIsBetting] = useState(false);
 
-  // 카드 비교 함수 (승리 족보 하이라이트용)
   const isCardInBestHand = (card, bestCards) => {
     if (!card || !bestCards) return false;
     return bestCards.some(bc => bc.rank === card.rank && bc.suit === card.suit);
@@ -36,34 +38,51 @@ function App() {
     );
   };
 
-  // 게임 진행 (Start / Next)
-  const handleGameAction = async () => {
+  const handleStartGame = async () => {
     setLoading(true);
-    const endpoint = (phase === "waiting" || phase === "showdown") ? '/start' : '/next';
-
     try {
-      const response = await api.get(endpoint);
+      const response = await api.get('/start');
       if (response.data.error) {
         alert(response.data.error);
       } else {
         setGameData(response.data);
         setPhase(response.data.phase);
-        if (response.data.is_game_over) setIsGameOver(true);
+        setBetAmount(50);
+        setIsBetting(false); // 시작 시 베팅창 닫기
       }
     } catch (error) {
-      console.error("연결 실패:", error);
+      console.error("시작 실패:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // 기권 (Fold)
+  const handlePlayerAction = async (actionType) => {
+    setLoading(true);
+    try {
+      const response = await api.get(`/next?action=${actionType}&bet=${betAmount}`);
+      if (response.data.error) {
+        alert(response.data.error);
+      } else {
+        setGameData(response.data);
+        setPhase(response.data.phase);
+        setIsBetting(false); // 액션 성공 시 베팅창 닫기
+        if (response.data.is_game_over) setIsGameOver(true);
+      }
+    } catch (error) {
+      console.error("액션 실패:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFold = async () => {
     setLoading(true);
     try {
       const response = await api.post('/fold');
       setGameData(response.data);
       setPhase(response.data.phase);
+      setIsBetting(false);
       if (response.data.is_game_over) setIsGameOver(true);
     } catch (error) {
       console.error("Fold 실패:", error);
@@ -72,7 +91,6 @@ function App() {
     }
   };
 
-  // 게임 전체 리셋 (파산 후 다시 시작)
   const handleFullReset = async () => {
     try {
       await api.post('/reset');
@@ -85,23 +103,8 @@ function App() {
     }
   };
 
-  // 🧪 테스트용: 강제 파산 트리거 함수
-  const triggerBankruptTest = async (target = 'player') => {
-    setLoading(true);
-    try {
-      const response = await api.post(`/test/bankrupt?target=${target}`);
-      setGameData(prev => ({ ...prev, ...response.data }));
-      if (response.data.is_game_over) setIsGameOver(true);
-    } catch (error) {
-      console.error("테스트 실패:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="poker-app">
-      {/* 상단 자산 표시 바 */}
       <div className="status-bar">
         <div className="money-item dealer">Dealer: <span>${gameData?.dealer_money ?? 1000}</span></div>
         <div className="money-item pot">Pot: <span className="pot-text">${gameData?.pot ?? 0}</span></div>
@@ -111,15 +114,11 @@ function App() {
       <h1>Texas Hold'em Table</h1>
 
       <div className="game-board">
-        {/* 딜러 섹션 */}
         <div className={`section dealer-section ${phase === "showdown" && gameData?.winner === 'dealer' ? 'winner-border' : ''}`}>
           <h2>Dealer Hand</h2>
           <div className="card-row">
             {phase === "showdown" && gameData?.dealer_hand ? 
-              gameData.dealer_hand.map((card, i) => renderCard(
-                card, i, false, 
-                gameData.winner === 'dealer' && isCardInBestHand(card, gameData.dealer_best_cards)
-              )) 
+              gameData.dealer_hand.map((card, i) => renderCard(card, i, false, gameData.winner === 'dealer' && isCardInBestHand(card, gameData.dealer_best_cards))) 
               : <><div className="card-placeholder"></div><div className="card-placeholder"></div></>}
           </div>
           <div className="hand-name">{phase === "showdown" && gameData?.dealer_best}</div>
@@ -127,14 +126,11 @@ function App() {
 
         <div className="divider"></div>
 
-        {/* 공통 카드 섹션 */}
         <div className="section community-section">
           <div className="card-row">
             {gameData?.community_cards?.map((card, i) => {
               const isShowdown = phase === "showdown";
-              const bestCards = isShowdown 
-                ? (gameData.winner === 'dealer' ? gameData.dealer_best_cards : gameData.player_best_cards)
-                : [];
+              const bestCards = isShowdown ? (gameData.winner === 'dealer' ? gameData.dealer_best_cards : gameData.player_best_cards) : [];
               return renderCard(card, i, true, isShowdown && isCardInBestHand(card, bestCards));
             })}
           </div>
@@ -142,59 +138,67 @@ function App() {
 
         <div className="divider"></div>
 
-        {/* 플레이어 섹션 */}
         <div className={`section player-section ${phase === 'showdown' && gameData?.winner === 'player' ? 'winner-border' : ''}`}>
           <h2>Your Hand</h2>
           <div className="card-row">
-            {gameData?.player_hand?.map((card, i) => renderCard(
-              card, i, false, 
-              phase === "showdown" && gameData.winner === 'player' && isCardInBestHand(card, gameData.player_best_cards)
-            ))}
+            {gameData?.player_hand?.map((card, i) => renderCard(card, i, false, phase === "showdown" && gameData.winner === 'player' && isCardInBestHand(card, gameData.player_best_cards)))}
           </div>
           <div className={`hand-name ${phase === "showdown" ? 'active' : ''}`}>{gameData?.player_best}</div>
         </div>
       </div>
 
-      {/* 하단 컨트롤 버튼 */}
       <div className="controls">
         {phase === "waiting" || phase === "showdown" ? (
-          <button className="btn btn-start" onClick={handleGameAction} disabled={loading}>
+          <button className="btn btn-start luxury" onClick={handleStartGame} disabled={loading}>
             {phase === "showdown" ? "New Game ($-50)" : "Start Game ($-50)"}
           </button>
         ) : (
-          <div className="action-group">
-            <button className="btn btn-fold" onClick={handleFold} disabled={loading}>Fold (기권)</button>
-            <button className="btn btn-call" onClick={handleGameAction} disabled={loading}>
-              {phase === "river" ? "Check Result" : "Call ($-50)"}
-            </button>
+          <div className="action-area">
+            {/* 2. Raise 버튼 클릭 시 나타나는 콤팩트 슬라이더 영역 */}
+            {isBetting ? (
+              <div className="bet-toggle-container">
+                <div className="bet-slider-box">
+                  <div className="bet-label-mini">Raise: <span>${betAmount}</span></div>
+                  <input 
+                    type="range" 
+                    min="10" 
+                    max={Math.min(gameData?.player_money || 1000, gameData?.dealer_money || 1000)} 
+                    step="10"
+                    value={betAmount}
+                    onChange={(e) => setBetAmount(parseInt(e.target.value))}
+                  />
+                </div>
+                <div className="bet-toggle-btns">
+                  <button className="btn btn-confirm" onClick={() => handlePlayerAction('raise')}>확정</button>
+                  <button className="btn btn-cancel" onClick={() => setIsBetting(false)}>취소</button>
+                </div>
+              </div>
+            ) : (
+              <div className="action-group horizontal">
+                <button className="btn btn-fold" onClick={handleFold} disabled={loading}>Fold</button>
+                <button className="btn btn-check" onClick={() => handlePlayerAction('check')} disabled={loading}>Check</button>
+                <button className="btn btn-call" onClick={() => handlePlayerAction('call')} disabled={loading}>Call</button>
+                <button className="btn btn-raise" onClick={() => setIsBetting(true)} disabled={loading}>Raise</button>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* 파산 엔딩 오버레이 (중앙 정렬 구조) */}
       {isGameOver && (
         <div className="game-over-overlay">
           <div className="game-over-content">
             <div className="game-over-info">
-              <h1>{gameData?.player_money <= 0 ? "GAME OVER" : "CHAMPION!"}</h1>
+              <h1 className="luxury-text">{gameData?.player_money <= 0 ? "GAME OVER" : "CHAMPION!"}</h1>
               <p>{gameData?.player_money <= 0 ? "모든 자산을 잃었습니다." : "딜러를 파산시켰습니다!"}</p>
               <div className="final-stats">최종 자산: <span>${gameData?.player_money}</span></div>
             </div>
             <div className="game-over-actions">
-              <button className="btn btn-start" onClick={handleFullReset}>
-                다시 도전하기
-              </button>
+              <button className="btn btn-start luxury" onClick={handleFullReset}>다시 시작하기</button>
             </div>
           </div>
         </div>
       )}
-
-      {/* 🧪 개발용 테스트 버튼 그룹 (확인 후 이 <div> 전체를 삭제하세요)
-      <div style={{ position: 'fixed', bottom: '20px', right: '20px', display: 'flex', gap: '10px', zIndex: 9999 }}>
-        <button onClick={() => triggerBankruptTest('player')} style={{ padding: '8px', fontSize: '11px', opacity: 0.5, cursor: 'pointer' }}>플레이어 파산</button>
-        <button onClick={() => triggerBankruptTest('dealer')} style={{ padding: '8px', fontSize: '11px', opacity: 0.5, cursor: 'pointer' }}>딜러 파산</button>
-      </div> */}
-
     </div>
   );
 }
