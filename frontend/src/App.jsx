@@ -57,6 +57,7 @@ function App() {
     );
   };
 
+  // 1. 게임 시작 시 (Pre-flop 딜러 선공 딜레이 조절)
   const handleStartGame = async () => {
     setLoading(true);
     setDealerMsg("");
@@ -64,30 +65,46 @@ function App() {
       const response = await api.get("/start");
       if (response.data.error) {
         alert(response.data.error);
+        setLoading(false);
       } else {
+        // [1단계] 즉시 실행: 카드와 돈, 판돈 정보를 화면에 바로 뿌립니다.
         setGameData(response.data);
         setPhase(response.data.phase);
         setBetAmount(50);
         setIsBetting(false);
 
+        // [2단계] 조건부 딜레이: 유저가 D일 때만 딜러가 고민하는 연출을 줍니다.
         if (response.data.dealer_button === "player") {
-          setIsDealerTurn(true);
-          setDealerMsg("Dealer's Turn...");
+          setIsDealerTurn(true); // 버튼 잠금
+          setDealerMsg("Thinking..."); // 고민 중 메시지 즉시 표시
+
+          setTimeout(() => {
+            // 서버에서 이미 받아온 dealer_action이 있다면 1.5초 뒤에 공개
+            if (response.data.dealer_action) {
+              setDealerMsg(response.data.dealer_action);
+            }
+            setIsDealerTurn(false); // 유저 버튼 활성화
+            setLoading(false); // 전체 로딩 해제
+          }, 1500);
         } else {
+          // 딜러가 D라면 딜레이 없이 바로 유저 턴
           setIsDealerTurn(false);
+          setLoading(false);
         }
       }
     } catch (error) {
       console.error("시작 실패:", error);
-    } finally {
       setLoading(false);
     }
   };
 
+  // 2. 게임 도중 (유저 액션 후 딜러 반응 및 페이즈 전환 딜레이)
   const handlePlayerAction = async (actionType) => {
     if (isDealerTurn) return;
     setLoading(true);
     setDealerMsg("Thinking...");
+    setIsDealerTurn(true);
+
     try {
       const response = await api.get(
         `/next?action=${actionType}&bet=${betAmount}`,
@@ -95,20 +112,49 @@ function App() {
       if (response.data.error) {
         alert(response.data.error);
         setDealerMsg("");
-      } else {
-        setGameData(response.data);
-        setPhase(response.data.phase);
-        setIsBetting(false);
-        if (response.data.dealer_action) {
-          setDealerMsg(response.data.dealer_action);
-        }
-        if (response.data.is_game_over) setIsGameOver(true);
         setIsDealerTurn(false);
+        setLoading(false);
+      } else {
+        // 1. 첫 번째 딜레이 (1.5초): 딜러가 고민하다가 액션을 결정함
+        setTimeout(() => {
+          // [수정] 자산 데이터와 딜러 메시지만 먼저 업데이트
+          setGameData({
+            ...gameData,
+            player_money: response.data.player_money,
+            dealer_money: response.data.dealer_money,
+            pot: response.data.pot,
+          });
+
+          if (response.data.dealer_action) {
+            setDealerMsg(response.data.dealer_action);
+          }
+
+          // 만약 쇼다운(결과) 페이즈라면, 메시지 확인을 위해 1초 더 기다림
+          if (response.data.phase === "showdown") {
+            setTimeout(() => {
+              setGameData(response.data); // 여기서 비로소 딜러 패와 승자 정보 업데이트
+              setPhase(response.data.phase);
+
+              // 파산 창은 패 공개 후 다시 4초 뒤에 출력
+              if (response.data.is_game_over) {
+                setTimeout(() => setIsGameOver(true), 2500);
+              }
+              setLoading(false);
+            }, 1000); // [핵심] 딜러 메시지 출력 후 1초 대기
+          } else {
+            // 쇼다운이 아닌 일반 페이즈 전환은 바로 진행
+            setGameData(response.data);
+            setPhase(response.data.phase);
+            setIsBetting(false);
+            setIsDealerTurn(false);
+            setLoading(false);
+          }
+        }, 1000); // 딜러 고민 딜레이
       }
     } catch (error) {
       console.error("액션 실패:", error);
       setDealerMsg("Error");
-    } finally {
+      setIsDealerTurn(false);
       setLoading(false);
     }
   };
@@ -160,13 +206,11 @@ function App() {
       <h1>Texas Hold'em Table</h1>
 
       <div className="game-board">
-        {/* 딜러 섹션 */}
         <div
           className={`section dealer-section ${phase === "showdown" && gameData?.winner === "dealer" ? "winner-border" : ""}`}
         >
           <h2>Dealer Hand</h2>
           <div className="card-area-wrapper">
-            {/* 왼쪽 사이드: 딜러 버튼 및 말풍선 */}
             <div className="dealer-action-aside left-aside">
               {gameData?.dealer_button === "dealer" && (
                 <span className="d-button-puck">D</span>
@@ -179,7 +223,6 @@ function App() {
                 </div>
               )}
             </div>
-
             <div className="card-row">
               {phase === "showdown" && gameData?.dealer_hand ? (
                 gameData.dealer_hand.map((card, i) =>
@@ -198,7 +241,6 @@ function App() {
                 </>
               )}
             </div>
-            {/* 우측 사이드: 대칭을 위한 빈 공간 */}
             <div className="dealer-action-aside"></div>
           </div>
           <div className="dealer-status-container">
@@ -233,19 +275,16 @@ function App() {
 
         <div className="divider"></div>
 
-        {/* 플레이어 섹션 */}
         <div
           className={`section player-section ${phase === "showdown" && gameData?.winner === "player" ? "winner-border" : ""}`}
         >
           <h2>Your Hand</h2>
           <div className="card-area-wrapper">
-            {/* 왼쪽 사이드: 딜러 버튼 위치 */}
             <div className="dealer-action-aside left-aside">
               {gameData?.dealer_button === "player" && (
                 <span className="d-button-puck">D</span>
               )}
             </div>
-
             <div className="card-row">
               {gameData?.player_hand?.map((card, i) =>
                 renderCard(
@@ -273,10 +312,11 @@ function App() {
             onClick={handleStartGame}
             disabled={loading}
           >
-            {phase === "showdown" ? "New Game ($-50)" : "Start Game ($-50)"}
+            {phase === "showdown" ? "Next Game ($-50)" : "Start Game ($-50)"}
           </button>
         ) : (
           <div className="action-area">
+            {/* isDealerTurn이 false가 되어야 disabled-ui가 제거됨 */}
             <div
               className={`action-container ${isDealerTurn ? "disabled-ui" : ""}`}
             >

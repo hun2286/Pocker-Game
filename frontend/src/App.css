@@ -90,46 +90,48 @@ h1 {
   position: relative;
 }
 
-/* 4. 딜러/플레이어 영역 레이아웃 (카드 위치 고정 및 요소 독립 배치) */
+/* 4. 딜러/플레이어 영역 레이아웃 (카드 위치 절대 고정 및 요소 독립 배치) */
 .card-area-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  position: relative; /* 자식 요소인 aside의 기준점 */
-  min-height: 100px; /* 영역 확보 */
+  position: relative;
+  min-height: 100px;
 }
 
-/* [핵심] 메시지가 있든 없든 카드는 항상 정중앙 고정 */
+/* 카드는 항상 정중앙 고정 */
 .card-row {
   display: flex;
   justify-content: center;
   gap: 8px;
   height: 85px;
   align-items: center;
-  position: relative;
-  z-index: 1; /* 카드 위로 메시지가 올 수 있도록 설정 */
+  z-index: 1;
 }
 
-/* 메시지와 버튼을 담는 영역을 Absolute로 변경하여 카드를 밀지 않게 함 */
+/* 메시지와 버튼을 담는 영역 (카드를 절대 밀지 않음) */
 .dealer-action-aside {
   position: absolute;
-  /* 카드 로우의 왼쪽 끝에 위치하도록 정렬 */
-  right: calc(
-    50% + 75px
-  ); /* 중앙선(50%) + 카드뭉치 절반 너비(약 75px) 만큼 왼쪽으로 */
+  /* 카드 로우의 왼쪽 끝 기준점 (중앙 50%에서 카드 절반 너비만큼 왼쪽으로) */
+  right: calc(50% + 75px);
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  pointer-events: none; /* 클릭 이벤트가 카드를 방해하지 않게 함 */
+  pointer-events: none;
 }
 
 .left-aside {
-  gap: 15px;
-  pointer-events: auto; /* 버튼은 클릭 가능하게 복구 */
+  /* 불필요한 min-width 제거하여 카드 밀림 방지 */
+  pointer-events: auto;
 }
 
+/* [핵심] 딜러 버튼 고정 스타일 */
 .d-button-puck {
+  position: absolute;
+  /* 말풍선 유무와 상관없이 이 위치에 고정 */
+  right: 0;
   width: 28px;
   height: 28px;
   background-color: #ffffff;
@@ -144,10 +146,12 @@ h1 {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   flex-shrink: 0;
 
-  /* [위치 고정] 부모를 밀지 않고 시각적으로만 위로 이동 */
+  /* 위치 조정 (위로 올림) */
   transform: translateY(-45px);
+  z-index: 5;
 }
 
+/* 말풍선 스타일 - 버튼 뒤쪽으로 위치하게 함 */
 .dealer-bubble-side {
   background: #f1c40f;
   color: #1a472a;
@@ -159,6 +163,9 @@ h1 {
   position: relative;
   animation: pop-in-side 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   white-space: nowrap;
+
+  /* 버튼과 겹치지 않게 여백 확보 (D버튼이 오른쪽에 있으므로) */
+  margin-right: 40px;
 }
 
 .dealer-bubble-side::after {
@@ -309,7 +316,6 @@ h2 {
   margin: 0 10px;
 }
 
-/* 9. 컨트롤 버튼 레이아웃 */
 /* 9. 컨트롤 버튼 레이아웃 (강제 너비 확장) */
 .controls {
   margin-top: auto;
@@ -372,6 +378,7 @@ h2 {
   color: #f1c40f;
   border: 2px solid #f1c40f;
   width: 280px;
+  height: 70px;
   flex: none;
 }
 
