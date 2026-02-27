@@ -15,6 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 초기 자금 2000 설정
 INITIAL_STATE = {
     "player_money": 2000,
     "dealer_money": 2000,
@@ -68,38 +69,24 @@ def next_phase(action: str = "call", bet: int = 50):
     phase = game_state["phase"]
     deck = game_state["deck"]
 
-    # 1. 플레이어 액션 처리
-    if action == "fold":
-        return fold_game()
-
-    # 2. 딜러 AI 의사결정 로직
-    # 현재 단계까지의 카드로 딜러 패 등급 평가
+    # 1. 딜러 AI 의사결정 로직
     d_res = evaluate_hand(game_state["dealer_hand"] + game_state["community_cards"])
-    hand_score = d_res.get("score", 0)  # 0(하이카드) ~ 8(스플)
+    hand_score = d_res.get("score", 0)
 
-    dealer_action = "CALL"  # 기본 액션
-
+    dealer_action = "CALL"
     if action == "raise":
-        # 플레이어가 레이즈했을 때 딜러의 판단
-        # 패가 아주 구린데(하이카드) 레이즈가 들어오면 60% 확률로 폴드 (블러핑 방어 실패)
         if hand_score == 0 and bet >= 100:
             if random.random() < 0.6:
                 dealer_action = "FOLD"
-        # 패가 중간(원페어)인데 너무 큰 레이즈(300 이상)면 30% 확률로 폴드
         elif hand_score == 1 and bet >= 300:
             if random.random() < 0.3:
                 dealer_action = "FOLD"
-        # 패가 매우 좋으면(트리플 이상) 무조건 콜 (나중에 딜러 역레이즈 로직 추가 가능)
-        elif hand_score >= 3:
-            dealer_action = "CALL"
-
     elif action == "check":
         dealer_action = "CHECK"
 
-    # 3. 딜러가 FOLD했을 경우 즉시 정산
+    # 2. 딜러가 기권(FOLD)한 경우 즉시 정산
     if dealer_action == "FOLD":
         game_state["player_money"] += game_state["pot"]
-        current_pot = game_state["pot"]
         game_state["pot"] = 0
         game_state["phase"] = "waiting"
         return {
@@ -108,11 +95,10 @@ def next_phase(action: str = "call", bet: int = 50):
             "player_money": game_state["player_money"],
             "dealer_money": game_state["dealer_money"],
             "pot": 0,
-            "message": "딜러가 기권했습니다!",
             "is_game_over": game_state["dealer_money"] <= 0,
         }
 
-    # 4. 자금 차감 및 판돈 합산 (Call/Raise 상황)
+    # 3. 배팅 금액 처리
     actual_bet = bet if action != "check" else 0
     if (
         game_state["player_money"] < actual_bet
@@ -124,7 +110,11 @@ def next_phase(action: str = "call", bet: int = 50):
     game_state["dealer_money"] -= actual_bet
     game_state["pot"] += actual_bet * 2
 
-    # 5. 페이즈 전환 (카드 오픈)
+    # 4. 페이즈 전환 로직 (유저님의 룰 반영)
+    if phase == "river":
+        # 리버에서 배팅이 끝났으므로 결과 정산으로 진입
+        return finish_and_showdown(dealer_action)
+
     if phase == "pre-flop":
         game_state["community_cards"] += [deck.pop() for _ in range(3)]
         game_state["phase"] = "flop"
@@ -134,56 +124,54 @@ def next_phase(action: str = "call", bet: int = 50):
     elif phase == "turn":
         game_state["community_cards"].append(deck.pop())
         game_state["phase"] = "river"
-    elif phase == "river":
-        # 최종 결과 (Showdown)
-        p_final = evaluate_hand(
-            game_state["player_hand"] + game_state["community_cards"]
-        )
-        d_final = evaluate_hand(
-            game_state["dealer_hand"] + game_state["community_cards"]
-        )
-        winner = determine_winner(p_final, d_final)
-        game_state["phase"] = "showdown"
 
-        if winner == "player":
-            game_state["player_money"] += game_state["pot"]
-        elif winner == "dealer":
-            game_state["dealer_money"] += game_state["pot"]
-        elif winner == "draw":
-            game_state["player_money"] += game_state["pot"] // 2
-            game_state["dealer_money"] += game_state["pot"] // 2
-
-        current_pot = game_state["pot"]
-        game_state["pot"] = 0
-        return {
-            "phase": "showdown",
-            "dealer_action": dealer_action,
-            "community_cards": game_state["community_cards"],
-            "player_hand": game_state["player_hand"],
-            "dealer_hand": game_state["dealer_hand"],
-            "winner": winner,
-            "player_best": p_final["name"],
-            "dealer_best": d_final["name"],
-            "player_best_cards": p_final["cards"],
-            "dealer_best_cards": d_final["cards"],
-            "player_money": game_state["player_money"],
-            "dealer_money": game_state["dealer_money"],
-            "pot": current_pot,
-            "is_game_over": game_state["player_money"] <= 0
-            or game_state["dealer_money"] <= 0,
-        }
-
-    # 현재 페이즈 정보 반환
+    # 현재 상태 반환
     p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
     return {
         "phase": game_state["phase"],
-        "dealer_action": dealer_action,  # 프론트엔드 말풍선용
+        "dealer_action": dealer_action,
         "community_cards": game_state["community_cards"],
         "player_hand": game_state["player_hand"],
         "player_best": p_res["name"],
         "player_money": game_state["player_money"],
         "dealer_money": game_state["dealer_money"],
         "pot": game_state["pot"],
+    }
+
+
+def finish_and_showdown(dealer_action):
+    p_final = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
+    d_final = evaluate_hand(game_state["dealer_hand"] + game_state["community_cards"])
+    winner = determine_winner(p_final, d_final)
+    game_state["phase"] = "showdown"
+
+    if winner == "player":
+        game_state["player_money"] += game_state["pot"]
+    elif winner == "dealer":
+        game_state["dealer_money"] += game_state["pot"]
+    elif winner == "draw":
+        game_state["player_money"] += game_state["pot"] // 2
+        game_state["dealer_money"] += game_state["pot"] // 2
+
+    current_pot = game_state["pot"]
+    game_state["pot"] = 0
+
+    return {
+        "phase": "showdown",
+        "dealer_action": dealer_action,
+        "community_cards": game_state["community_cards"],
+        "player_hand": game_state["player_hand"],
+        "dealer_hand": game_state["dealer_hand"],
+        "winner": winner,
+        "player_best": p_final["name"],
+        "dealer_best": d_final["name"],
+        "player_best_cards": p_final["cards"],
+        "dealer_best_cards": d_final["cards"],
+        "player_money": game_state["player_money"],
+        "dealer_money": game_state["dealer_money"],
+        "pot": current_pot,
+        "is_game_over": game_state["player_money"] <= 0
+        or game_state["dealer_money"] <= 0,
     }
 
 
