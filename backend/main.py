@@ -15,7 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 초기 자금 2000 설정
+# 초기 자금 및 설정
 INITIAL_STATE = {
     "player_money": 2000,
     "dealer_money": 2000,
@@ -29,6 +29,7 @@ game_state = {
     "community_cards": [],
     "phase": "waiting",
     "pot": 0,
+    "dealer_button": None,  # 누가 딜러 버튼(마지막 차례)을 가졌는가? ('player' or 'dealer')
     **INITIAL_STATE,
 }
 
@@ -40,6 +41,10 @@ def start_game():
         or game_state["dealer_money"] < game_state["ante"]
     ):
         return {"error": "자금이 부족합니다!", "is_game_over": True}
+
+    # 첫 판인 경우 랜덤으로 딜러 버튼 결정
+    if game_state["dealer_button"] is None:
+        game_state["dealer_button"] = random.choice(["player", "dealer"])
 
     game_state["player_money"] -= game_state["ante"]
     game_state["dealer_money"] -= game_state["ante"]
@@ -61,6 +66,7 @@ def start_game():
         "player_money": game_state["player_money"],
         "dealer_money": game_state["dealer_money"],
         "pot": game_state["pot"],
+        "dealer_button": game_state["dealer_button"],  # 누가 버튼인지 알려줌
     }
 
 
@@ -84,11 +90,12 @@ def next_phase(action: str = "call", bet: int = 50):
     elif action == "check":
         dealer_action = "CHECK"
 
-    # 2. 딜러가 기권(FOLD)한 경우 즉시 정산
+    # 2. 딜러가 기권(FOLD)한 경우 즉시 정산 (승자인 플레이어가 다음 판 버튼 획득)
     if dealer_action == "FOLD":
         game_state["player_money"] += game_state["pot"]
         game_state["pot"] = 0
         game_state["phase"] = "waiting"
+        game_state["dealer_button"] = "player"  # 승자가 버튼 획득
         return {
             "phase": "waiting",
             "dealer_action": "FOLD",
@@ -96,6 +103,7 @@ def next_phase(action: str = "call", bet: int = 50):
             "dealer_money": game_state["dealer_money"],
             "pot": 0,
             "is_game_over": game_state["dealer_money"] <= 0,
+            "dealer_button": "player",
         }
 
     # 3. 배팅 금액 처리
@@ -110,9 +118,8 @@ def next_phase(action: str = "call", bet: int = 50):
     game_state["dealer_money"] -= actual_bet
     game_state["pot"] += actual_bet * 2
 
-    # 4. 페이즈 전환 로직 (유저님의 룰 반영)
+    # 4. 페이즈 전환 로직
     if phase == "river":
-        # 리버에서 배팅이 끝났으므로 결과 정산으로 진입
         return finish_and_showdown(dealer_action)
 
     if phase == "pre-flop":
@@ -125,7 +132,6 @@ def next_phase(action: str = "call", bet: int = 50):
         game_state["community_cards"].append(deck.pop())
         game_state["phase"] = "river"
 
-    # 현재 상태 반환
     p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
     return {
         "phase": game_state["phase"],
@@ -136,6 +142,7 @@ def next_phase(action: str = "call", bet: int = 50):
         "player_money": game_state["player_money"],
         "dealer_money": game_state["dealer_money"],
         "pot": game_state["pot"],
+        "dealer_button": game_state["dealer_button"],
     }
 
 
@@ -147,11 +154,14 @@ def finish_and_showdown(dealer_action):
 
     if winner == "player":
         game_state["player_money"] += game_state["pot"]
+        game_state["dealer_button"] = "player"  # 플레이어가 이기면 다음 판 딜러 버튼
     elif winner == "dealer":
         game_state["dealer_money"] += game_state["pot"]
+        game_state["dealer_button"] = "dealer"  # 딜러가 이기면 다음 판 딜러 버튼
     elif winner == "draw":
         game_state["player_money"] += game_state["pot"] // 2
         game_state["dealer_money"] += game_state["pot"] // 2
+        # 무승부 시 기존 딜러 버튼 소유자 유지 (변경 없음)
 
     current_pot = game_state["pot"]
     game_state["pot"] = 0
@@ -170,6 +180,7 @@ def finish_and_showdown(dealer_action):
         "player_money": game_state["player_money"],
         "dealer_money": game_state["dealer_money"],
         "pot": current_pot,
+        "dealer_button": game_state["dealer_button"],
         "is_game_over": game_state["player_money"] <= 0
         or game_state["dealer_money"] <= 0,
     }
@@ -180,11 +191,15 @@ def fold_game():
     game_state["dealer_money"] += game_state["pot"]
     game_state["pot"] = 0
     game_state["phase"] = "waiting"
+    game_state["dealer_button"] = (
+        "dealer"  # 폴드하면 상대방(딜러)이 승자이므로 버튼 가져감
+    )
     return {
         "phase": "waiting",
         "player_money": game_state["player_money"],
         "dealer_money": game_state["dealer_money"],
         "pot": 0,
+        "dealer_button": "dealer",
         "is_game_over": game_state["player_money"] <= 0,
     }
 
@@ -196,4 +211,5 @@ def reset_game():
     game_state["pot"] = 0
     game_state["phase"] = "waiting"
     game_state["community_cards"] = []
+    game_state["dealer_button"] = None  # 리셋 시 다시 랜덤으로 정하도록 초기화
     return {"message": "Game Reset Success"}
