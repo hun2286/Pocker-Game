@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from modules.cards import create_deck
 from modules.evaluator import evaluate_hand
 from modules.game_engine import determine_winner
+import random
 
 app = FastAPI()
 
@@ -14,15 +15,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 1. 게임의 '태초 상태'를 상수로 보관 (리셋 시 사용)
 INITIAL_STATE = {
-    "player_money": 1000,
-    "dealer_money": 1000,
+    "player_money": 2000,
+    "dealer_money": 2000,
     "ante": 50,
-    "call_bet": 50,
 }
 
-# 2. 실시간 게임 상태
 game_state = {
     "deck": [],
     "player_hand": [],
@@ -30,23 +28,18 @@ game_state = {
     "community_cards": [],
     "phase": "waiting",
     "pot": 0,
-    **INITIAL_STATE,  # 초기값 언패킹
+    **INITIAL_STATE,
 }
 
 
 @app.get("/start")
 def start_game():
-    # 시작 전 자금 체크 (파산 상태면 시작 불가)
     if (
         game_state["player_money"] < game_state["ante"]
         or game_state["dealer_money"] < game_state["ante"]
     ):
-        return {
-            "error": "자금이 부족하여 게임을 시작할 수 없습니다!",
-            "is_game_over": True,
-        }
+        return {"error": "자금이 부족합니다!", "is_game_over": True}
 
-    # 참가비 차감
     game_state["player_money"] -= game_state["ante"]
     game_state["dealer_money"] -= game_state["ante"]
     game_state["pot"] = game_state["ante"] * 2
@@ -64,7 +57,6 @@ def start_game():
         "player_hand": game_state["player_hand"],
         "community_cards": game_state["community_cards"],
         "player_best": p_res["name"],
-        "player_best_cards": p_res["cards"],
         "player_money": game_state["player_money"],
         "dealer_money": game_state["dealer_money"],
         "pot": game_state["pot"],
@@ -76,35 +68,63 @@ def next_phase(action: str = "call", bet: int = 50):
     phase = game_state["phase"]
     deck = game_state["deck"]
 
-    # 1. 액션별 배팅 처리 로직
+    # 1. 플레이어 액션 처리
     if action == "fold":
-        # 폴드는 현재까지의 판돈을 모두 상대(딜러)에게 줍니다.
-        game_state["dealer_money"] += game_state["pot"]
+        return fold_game()
+
+    # 2. 딜러 AI 의사결정 로직
+    # 현재 단계까지의 카드로 딜러 패 등급 평가
+    d_res = evaluate_hand(game_state["dealer_hand"] + game_state["community_cards"])
+    hand_score = d_res.get("score", 0)  # 0(하이카드) ~ 8(스플)
+
+    dealer_action = "CALL"  # 기본 액션
+
+    if action == "raise":
+        # 플레이어가 레이즈했을 때 딜러의 판단
+        # 패가 아주 구린데(하이카드) 레이즈가 들어오면 60% 확률로 폴드 (블러핑 방어 실패)
+        if hand_score == 0 and bet >= 100:
+            if random.random() < 0.6:
+                dealer_action = "FOLD"
+        # 패가 중간(원페어)인데 너무 큰 레이즈(300 이상)면 30% 확률로 폴드
+        elif hand_score == 1 and bet >= 300:
+            if random.random() < 0.3:
+                dealer_action = "FOLD"
+        # 패가 매우 좋으면(트리플 이상) 무조건 콜 (나중에 딜러 역레이즈 로직 추가 가능)
+        elif hand_score >= 3:
+            dealer_action = "CALL"
+
+    elif action == "check":
+        dealer_action = "CHECK"
+
+    # 3. 딜러가 FOLD했을 경우 즉시 정산
+    if dealer_action == "FOLD":
+        game_state["player_money"] += game_state["pot"]
+        current_pot = game_state["pot"]
         game_state["pot"] = 0
         game_state["phase"] = "waiting"
         return {
             "phase": "waiting",
+            "dealer_action": "FOLD",
             "player_money": game_state["player_money"],
             "dealer_money": game_state["dealer_money"],
             "pot": 0,
-            "is_game_over": game_state["player_money"] <= 0,
+            "message": "딜러가 기권했습니다!",
+            "is_game_over": game_state["dealer_money"] <= 0,
         }
 
-    elif action == "check":
-        # 체크는 판돈 변화 없이 다음 카드로 넘어갑니다.
-        pass
+    # 4. 자금 차감 및 판돈 합산 (Call/Raise 상황)
+    actual_bet = bet if action != "check" else 0
+    if (
+        game_state["player_money"] < actual_bet
+        or game_state["dealer_money"] < actual_bet
+    ):
+        return {"error": "자금이 부족하여 배팅을 완료할 수 없습니다!"}
 
-    elif action in ["call", "raise"]:
-        # 유저가 배팅한 금액(bet)만큼 플레이어와 딜러 자금을 차감하고 판돈에 넣습니다.
-        # (현재는 딜러 AI가 없으므로 유저의 배팅을 딜러가 무조건 따라오는 'Call' 구조입니다.)
-        if game_state["player_money"] < bet or game_state["dealer_money"] < bet:
-            return {"error": "자금이 부족하여 배팅을 완료할 수 없습니다!"}
+    game_state["player_money"] -= actual_bet
+    game_state["dealer_money"] -= actual_bet
+    game_state["pot"] += actual_bet * 2
 
-        game_state["player_money"] -= bet
-        game_state["dealer_money"] -= bet
-        game_state["pot"] += bet * 2
-
-    # 2. 페이즈 전환 및 카드 오픈 로직 (기존과 동일)
+    # 5. 페이즈 전환 (카드 오픈)
     if phase == "pre-flop":
         game_state["community_cards"] += [deck.pop() for _ in range(3)]
         game_state["phase"] = "flop"
@@ -115,10 +135,14 @@ def next_phase(action: str = "call", bet: int = 50):
         game_state["community_cards"].append(deck.pop())
         game_state["phase"] = "river"
     elif phase == "river":
-        # 결과 정산 (Showdown)
-        p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
-        d_res = evaluate_hand(game_state["dealer_hand"] + game_state["community_cards"])
-        winner = determine_winner(p_res, d_res)
+        # 최종 결과 (Showdown)
+        p_final = evaluate_hand(
+            game_state["player_hand"] + game_state["community_cards"]
+        )
+        d_final = evaluate_hand(
+            game_state["dealer_hand"] + game_state["community_cards"]
+        )
+        winner = determine_winner(p_final, d_final)
         game_state["phase"] = "showdown"
 
         if winner == "player":
@@ -131,34 +155,32 @@ def next_phase(action: str = "call", bet: int = 50):
 
         current_pot = game_state["pot"]
         game_state["pot"] = 0
-        is_game_over = (
-            game_state["player_money"] <= 0 or game_state["dealer_money"] <= 0
-        )
-
         return {
             "phase": "showdown",
+            "dealer_action": dealer_action,
             "community_cards": game_state["community_cards"],
             "player_hand": game_state["player_hand"],
             "dealer_hand": game_state["dealer_hand"],
             "winner": winner,
-            "player_best": p_res["name"],
-            "dealer_best": d_res["name"],
-            "player_best_cards": p_res["cards"],
-            "dealer_best_cards": d_res["cards"],
+            "player_best": p_final["name"],
+            "dealer_best": d_final["name"],
+            "player_best_cards": p_final["cards"],
+            "dealer_best_cards": d_final["cards"],
             "player_money": game_state["player_money"],
             "dealer_money": game_state["dealer_money"],
             "pot": current_pot,
-            "is_game_over": is_game_over,
+            "is_game_over": game_state["player_money"] <= 0
+            or game_state["dealer_money"] <= 0,
         }
 
     # 현재 페이즈 정보 반환
     p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
     return {
         "phase": game_state["phase"],
+        "dealer_action": dealer_action,  # 프론트엔드 말풍선용
         "community_cards": game_state["community_cards"],
         "player_hand": game_state["player_hand"],
         "player_best": p_res["name"],
-        "player_best_cards": p_res["cards"],
         "player_money": game_state["player_money"],
         "dealer_money": game_state["dealer_money"],
         "pot": game_state["pot"],
@@ -170,44 +192,20 @@ def fold_game():
     game_state["dealer_money"] += game_state["pot"]
     game_state["pot"] = 0
     game_state["phase"] = "waiting"
-
-    # 폴드 직후에도 파산 여부 체크 (플레이어 돈이 0일 수 있음)
-    is_game_over = game_state["player_money"] <= 0 or game_state["dealer_money"] <= 0
-
     return {
         "phase": "waiting",
         "player_money": game_state["player_money"],
         "dealer_money": game_state["dealer_money"],
         "pot": 0,
-        "is_game_over": is_game_over,
+        "is_game_over": game_state["player_money"] <= 0,
     }
 
 
-# 파산 시 모든 자금을 1000으로 리셋하는 API
 @app.post("/reset")
 def reset_game():
-    game_state["player_money"] = 1000
-    game_state["dealer_money"] = 1000
+    game_state["player_money"] = 2000
+    game_state["dealer_money"] = 2000
     game_state["pot"] = 0
     game_state["phase"] = "waiting"
     game_state["community_cards"] = []
-    return {"message": "Game Reset Success", "player_money": 1000, "dealer_money": 1000}
-
-
-# 테스트용: 자금을 강제로 0원으로 만드는 API (확인 후 삭제 권장)
-# @app.post("/test/bankrupt")
-# def test_bankrupt(target: str = "player"):
-#     """
-#     target이 'player'면 플레이어 파산, 'dealer'면 딜러 파산
-#     """
-#     if target == "player":
-#         game_state["player_money"] = 0
-#     else:
-#         game_state["dealer_money"] = 0
-
-#     return {
-#         "message": f"Test: {target} is now bankrupt",
-#         "player_money": game_state["player_money"],
-#         "dealer_money": game_state["dealer_money"],
-#         "is_game_over": True,
-#     }
+    return {"message": "Game Reset Success"}
