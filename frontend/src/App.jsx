@@ -16,6 +16,10 @@ function App() {
   const [dealerMsg, setDealerMsg] = useState("");
   const [isDealerTurn, setIsDealerTurn] = useState(false);
 
+  // 이번 페이즈에서 유저가 더 내야 할 금액(Call 금액) 계산
+  const callAmount =
+    (gameData?.current_bet || 0) - (gameData?.player_phase_bet || 0);
+
   useEffect(() => {
     const initGame = async () => {
       try {
@@ -57,7 +61,6 @@ function App() {
     );
   };
 
-  // 1. 게임 시작 시 (Pre-flop 딜러 선공 딜레이 조절)
   const handleStartGame = async () => {
     setLoading(true);
     setDealerMsg("");
@@ -67,27 +70,24 @@ function App() {
         alert(response.data.error);
         setLoading(false);
       } else {
-        // [1단계] 즉시 실행: 카드와 돈, 판돈 정보를 화면에 바로 뿌립니다.
         setGameData(response.data);
         setPhase(response.data.phase);
         setBetAmount(50);
         setIsBetting(false);
 
-        // [2단계] 조건부 딜레이: 유저가 D일 때만 딜러가 고민하는 연출을 줍니다.
         if (response.data.dealer_button === "player") {
-          setIsDealerTurn(true); // 버튼 잠금
-          setDealerMsg("Thinking..."); // 고민 중 메시지 즉시 표시
+          setIsDealerTurn(true);
+          setDealerMsg("Thinking...");
 
           setTimeout(() => {
-            // 서버에서 이미 받아온 dealer_action이 있다면 1.5초 뒤에 공개
             if (response.data.dealer_action) {
               setDealerMsg(response.data.dealer_action);
             }
-            setIsDealerTurn(false); // 유저 버튼 활성화
-            setLoading(false); // 전체 로딩 해제
+            setGameData((prev) => ({ ...prev, ...response.data }));
+            setIsDealerTurn(false);
+            setLoading(false);
           }, 1500);
         } else {
-          // 딜러가 D라면 딜레이 없이 바로 유저 턴
           setIsDealerTurn(false);
           setLoading(false);
         }
@@ -98,9 +98,12 @@ function App() {
     }
   };
 
-  // 2. 게임 도중 (유저 액션 후 딜러 반응 및 페이즈 전환 딜레이)
   const handlePlayerAction = async (actionType) => {
     if (isDealerTurn) return;
+
+    // [수정 포인트] 확정 버튼을 누르자마자 베팅 UI를 즉시 닫습니다.
+    setIsBetting(false);
+
     setLoading(true);
     setDealerMsg("Thinking...");
     setIsDealerTurn(true);
@@ -115,41 +118,39 @@ function App() {
         setIsDealerTurn(false);
         setLoading(false);
       } else {
-        // 1. 첫 번째 딜레이 (1.5초): 딜러가 고민하다가 액션을 결정함
         setTimeout(() => {
-          // [수정] 자산 데이터와 딜러 메시지만 먼저 업데이트
-          setGameData({
-            ...gameData,
+          // 기존 카드 데이터를 유지하며 돈/베팅 정보만 먼저 업데이트
+          setGameData((prev) => ({
+            ...prev,
             player_money: response.data.player_money,
             dealer_money: response.data.dealer_money,
             pot: response.data.pot,
-          });
+            current_bet: response.data.current_bet,
+            player_phase_bet: response.data.player_phase_bet,
+          }));
 
           if (response.data.dealer_action) {
             setDealerMsg(response.data.dealer_action);
           }
 
-          // 만약 쇼다운(결과) 페이즈라면, 메시지 확인을 위해 1초 더 기다림
           if (response.data.phase === "showdown") {
             setTimeout(() => {
-              setGameData(response.data); // 여기서 비로소 딜러 패와 승자 정보 업데이트
+              setGameData(response.data);
               setPhase(response.data.phase);
-
-              // 파산 창은 패 공개 후 다시 2.5초 뒤에 출력
               if (response.data.is_game_over) {
                 setTimeout(() => setIsGameOver(true), 2500);
               }
               setLoading(false);
-            }, 1000); // [핵심] 딜러 메시지 출력 후 1초 대기
+            }, 1000);
           } else {
-            // 쇼다운이 아닌 일반 페이즈 전환은 바로 진행
-            setGameData(response.data);
-            setPhase(response.data.phase);
-            setIsBetting(false);
-            setIsDealerTurn(false);
-            setLoading(false);
+            setTimeout(() => {
+              setGameData(response.data);
+              setPhase(response.data.phase);
+              setIsDealerTurn(false);
+              setLoading(false);
+            }, 800);
           }
-        }, 1000); // 딜러 고민 딜레이
+        }, 1500);
       }
     } catch (error) {
       console.error("액션 실패:", error);
@@ -168,7 +169,9 @@ function App() {
       setGameData(response.data);
       setPhase(response.data.phase);
       setIsBetting(false);
-      if (response.data.is_game_over) setIsGameOver(true);
+      if (response.data.is_game_over) {
+        setTimeout(() => setIsGameOver(true), 2500);
+      }
     } catch (error) {
       console.error("Fold 실패:", error);
     } finally {
@@ -316,7 +319,6 @@ function App() {
           </button>
         ) : (
           <div className="action-area">
-            {/* isDealerTurn이 false가 되어야 disabled-ui가 제거됨 */}
             <div
               className={`action-container ${isDealerTurn ? "disabled-ui" : ""}`}
             >
@@ -328,7 +330,7 @@ function App() {
                     </div>
                     <input
                       type="range"
-                      min="10"
+                      min="50"
                       max={Math.min(
                         gameData?.player_money || 2000,
                         gameData?.dealer_money || 2000,
@@ -336,21 +338,18 @@ function App() {
                       step="10"
                       value={betAmount}
                       onChange={(e) => setBetAmount(parseInt(e.target.value))}
-                      disabled={isDealerTurn}
                     />
                   </div>
                   <div className="bet-toggle-btns">
                     <button
                       className="btn btn-confirm"
                       onClick={() => handlePlayerAction("raise")}
-                      disabled={isDealerTurn}
                     >
                       확정
                     </button>
                     <button
                       className="btn btn-cancel"
                       onClick={() => setIsBetting(false)}
-                      disabled={isDealerTurn}
                     >
                       취소
                     </button>
@@ -361,28 +360,28 @@ function App() {
                   <button
                     className="btn btn-fold"
                     onClick={handleFold}
-                    disabled={loading || isDealerTurn}
+                    disabled={loading}
                   >
                     Fold
                   </button>
                   <button
                     className="btn btn-check"
                     onClick={() => handlePlayerAction("check")}
-                    disabled={loading || isDealerTurn}
+                    disabled={loading || callAmount > 0}
                   >
                     Check
                   </button>
                   <button
                     className="btn btn-call"
                     onClick={() => handlePlayerAction("call")}
-                    disabled={loading || isDealerTurn}
+                    disabled={loading || callAmount <= 0}
                   >
-                    Call
+                    Call {callAmount > 0 ? `($${callAmount})` : ""}
                   </button>
                   <button
                     className="btn btn-raise"
                     onClick={() => setIsBetting(true)}
-                    disabled={loading || isDealerTurn}
+                    disabled={loading}
                   >
                     Raise
                   </button>
