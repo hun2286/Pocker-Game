@@ -72,23 +72,39 @@ def start_game():
 
 
 @app.get("/next")
-def next_phase():
+def next_phase(action: str = "call", bet: int = 50):
     phase = game_state["phase"]
     deck = game_state["deck"]
 
-    # 배팅 로직
-    if phase in ["pre-flop", "flop", "turn"]:
-        if (
-            game_state["player_money"] < game_state["call_bet"]
-            or game_state["dealer_money"] < game_state["call_bet"]
-        ):
-            pass
-        else:
-            game_state["player_money"] -= game_state["call_bet"]
-            game_state["dealer_money"] -= game_state["call_bet"]
-            game_state["pot"] += game_state["call_bet"] * 2
+    # 1. 액션별 배팅 처리 로직
+    if action == "fold":
+        # 폴드는 현재까지의 판돈을 모두 상대(딜러)에게 줍니다.
+        game_state["dealer_money"] += game_state["pot"]
+        game_state["pot"] = 0
+        game_state["phase"] = "waiting"
+        return {
+            "phase": "waiting",
+            "player_money": game_state["player_money"],
+            "dealer_money": game_state["dealer_money"],
+            "pot": 0,
+            "is_game_over": game_state["player_money"] <= 0,
+        }
 
-    # 카드 오픈 로직
+    elif action == "check":
+        # 체크는 판돈 변화 없이 다음 카드로 넘어갑니다.
+        pass
+
+    elif action in ["call", "raise"]:
+        # 유저가 배팅한 금액(bet)만큼 플레이어와 딜러 자금을 차감하고 판돈에 넣습니다.
+        # (현재는 딜러 AI가 없으므로 유저의 배팅을 딜러가 무조건 따라오는 'Call' 구조입니다.)
+        if game_state["player_money"] < bet or game_state["dealer_money"] < bet:
+            return {"error": "자금이 부족하여 배팅을 완료할 수 없습니다!"}
+
+        game_state["player_money"] -= bet
+        game_state["dealer_money"] -= bet
+        game_state["pot"] += bet * 2
+
+    # 2. 페이즈 전환 및 카드 오픈 로직 (기존과 동일)
     if phase == "pre-flop":
         game_state["community_cards"] += [deck.pop() for _ in range(3)]
         game_state["phase"] = "flop"
@@ -99,6 +115,7 @@ def next_phase():
         game_state["community_cards"].append(deck.pop())
         game_state["phase"] = "river"
     elif phase == "river":
+        # 결과 정산 (Showdown)
         p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
         d_res = evaluate_hand(game_state["dealer_hand"] + game_state["community_cards"])
         winner = determine_winner(p_res, d_res)
@@ -114,8 +131,6 @@ def next_phase():
 
         current_pot = game_state["pot"]
         game_state["pot"] = 0
-
-        # 쇼다운 결과 정산 후 파산 여부 체크
         is_game_over = (
             game_state["player_money"] <= 0 or game_state["dealer_money"] <= 0
         )
@@ -133,9 +148,10 @@ def next_phase():
             "player_money": game_state["player_money"],
             "dealer_money": game_state["dealer_money"],
             "pot": current_pot,
-            "is_game_over": is_game_over,  # 파산 여부 전달
+            "is_game_over": is_game_over,
         }
 
+    # 현재 페이즈 정보 반환
     p_res = evaluate_hand(game_state["player_hand"] + game_state["community_cards"])
     return {
         "phase": game_state["phase"],
