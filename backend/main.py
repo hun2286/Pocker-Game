@@ -29,10 +29,9 @@ game_state = {
     "phase": "waiting",
     "pot": 0,
     "dealer_button": None,
-    # [핵심] 베팅 추적을 위한 변수 추가
-    "current_bet": 0,  # 이번 라운드(페이즈)에서 맞춰야 할 목표 금액
-    "player_phase_bet": 0,  # 이번 라운드에 플레이어가 이미 지불한 금액
-    "dealer_phase_bet": 0,  # 이번 라운드에 딜러가 이미 지불한 금액
+    "current_bet": 0,
+    "player_phase_bet": 0,
+    "dealer_phase_bet": 0,
     **INITIAL_STATE,
 }
 
@@ -45,19 +44,19 @@ def reset_phase_bets():
 
 
 def get_common_response(dealer_action, p_res):
-    """프론트엔드 응답 공통 포맷 (카드 유지를 위해 항상 데이터 포함)"""
+    """프론트엔드 응답 공통 포맷"""
     return {
         "phase": game_state["phase"],
         "dealer_action": dealer_action,
         "community_cards": game_state["community_cards"],
-        "player_hand": game_state["player_hand"],  # 카드 정보 누락 방지
+        "player_hand": game_state["player_hand"],
         "player_best": p_res["name"],
         "player_money": game_state["player_money"],
         "dealer_money": game_state["dealer_money"],
         "pot": game_state["pot"],
         "dealer_button": game_state["dealer_button"],
-        "current_bet": game_state["current_bet"],  # 버튼 비활성화 제어용
-        "player_phase_bet": game_state["player_phase_bet"],  # 버튼 비활성화 제어용
+        "current_bet": game_state["current_bet"],
+        "player_phase_bet": game_state["player_phase_bet"],
     }
 
 
@@ -74,7 +73,6 @@ def start_game():
 
     reset_phase_bets()
 
-    # 안테 지불
     game_state["player_money"] -= game_state["ante"]
     game_state["dealer_money"] -= game_state["ante"]
     game_state["pot"] = game_state["ante"] * 2
@@ -108,14 +106,13 @@ def next_phase(action: str = "call", bet: int = 0):
     phase = game_state["phase"]
     deck = game_state["deck"]
 
-    # 1. 플레이어 베팅 정산 (상대 베팅액과의 차액 계산)
+    # 1. 플레이어 베팅 정산
     player_needed = game_state["current_bet"] - game_state["player_phase_bet"]
     actual_player_bet = 0
 
     if action == "call":
         actual_player_bet = player_needed
     elif action == "raise":
-        # 리레이즈 시: 콜 금액(player_needed) + 추가 베팅액(bet)
         actual_player_bet = player_needed + bet
         game_state["current_bet"] += bet
     elif action == "check":
@@ -128,32 +125,41 @@ def next_phase(action: str = "call", bet: int = 0):
     game_state["player_phase_bet"] += actual_player_bet
     game_state["pot"] += actual_player_bet
 
-    # 2. 딜러 AI 의사결정
-    d_res = evaluate_hand(game_state["dealer_hand"] + game_state["community_cards"])
-    hand_score = d_res.get("score", 0)
-    dealer_action = "CALL"
+    # 2. 딜러 AI 의사결정 (핵심 로직 수정)
+    dealer_action = "CHECK"
 
-    if action == "raise":
-        # 폴드 조건
+    if action == "call":
+        # 유저가 Call을 하면 즉시 금액이 맞춰지므로 딜러는 반응 없이 라운드 종료
+        dealer_action = "CALL"
+
+    elif action == "raise":
+        # 유저가 Raise를 했을 때만 딜러가 패를 보고 판단
+        d_res = evaluate_hand(game_state["dealer_hand"] + game_state["community_cards"])
+        hand_score = d_res.get("score", 0)
+
+        # 폴드 조건 체크
         if (hand_score == 0 and bet >= 100 and random.random() < 0.6) or (
             hand_score == 1 and bet >= 300 and random.random() < 0.3
         ):
             return handle_dealer_fold()
 
-        # 콜 처리: 딜러도 유저가 올린 기준선(current_bet)을 맞춤
+        # 폴드 안 하면 유저 베팅에 맞춰서 CALL
         dealer_needed = game_state["current_bet"] - game_state["dealer_phase_bet"]
         game_state["dealer_money"] -= dealer_needed
         game_state["dealer_phase_bet"] += dealer_needed
         game_state["pot"] += dealer_needed
         dealer_action = "CALL"
+
     elif action == "check":
+        # 유저가 체크를 한 경우 딜러도 체크 (이미 선공이 체크했거나 딜러가 선공인 상황)
         dealer_action = "CHECK"
 
     # 3. 페이즈 전환 로직
+    # 베팅 금액이 맞춰진 상태이므로 다음 페이즈로 이동
     if phase == "river":
         return finish_and_showdown(dealer_action)
 
-    reset_phase_bets()  # 라운드 종료 시 초기화
+    reset_phase_bets()  # 라운드 데이터 초기화
 
     if phase == "pre-flop":
         game_state["community_cards"] += [deck.pop() for _ in range(3)]
