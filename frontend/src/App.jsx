@@ -135,7 +135,7 @@ function App() {
               setGameData(response.data); // 여기서 비로소 딜러 패와 승자 정보 업데이트
               setPhase(response.data.phase);
 
-              // 파산 창은 패 공개 후 다시 4초 뒤에 출력
+              // 파산 창은 패 공개 후 다시 2.5초 뒤에 출력
               if (response.data.is_game_over) {
                 setTimeout(() => setIsGameOver(true), 2500);
               }
