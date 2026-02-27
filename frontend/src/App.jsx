@@ -13,11 +13,9 @@ function App() {
   const [isGameOver, setIsGameOver] = useState(false);
   const [betAmount, setBetAmount] = useState(50);
   const [isBetting, setIsBetting] = useState(false);
-
-  // 딜러의 상태 메시지 (말풍선용)
   const [dealerMsg, setDealerMsg] = useState("");
+  const [isDealerTurn, setIsDealerTurn] = useState(false);
 
-  // 앱 로드 시 백엔드 자산 리셋
   useEffect(() => {
     const initGame = async () => {
       try {
@@ -71,6 +69,13 @@ function App() {
         setPhase(response.data.phase);
         setBetAmount(50);
         setIsBetting(false);
+
+        if (response.data.dealer_button === "player") {
+          setIsDealerTurn(true);
+          setDealerMsg("Dealer's Turn...");
+        } else {
+          setIsDealerTurn(false);
+        }
       }
     } catch (error) {
       console.error("시작 실패:", error);
@@ -80,6 +85,7 @@ function App() {
   };
 
   const handlePlayerAction = async (actionType) => {
+    if (isDealerTurn) return;
     setLoading(true);
     setDealerMsg("Thinking...");
     try {
@@ -97,6 +103,7 @@ function App() {
           setDealerMsg(response.data.dealer_action);
         }
         if (response.data.is_game_over) setIsGameOver(true);
+        setIsDealerTurn(false);
       }
     } catch (error) {
       console.error("액션 실패:", error);
@@ -107,6 +114,7 @@ function App() {
   };
 
   const handleFold = async () => {
+    if (isDealerTurn) return;
     setLoading(true);
     setDealerMsg("");
     try {
@@ -128,6 +136,7 @@ function App() {
       setIsGameOver(false);
       setPhase("waiting");
       setGameData(null);
+      setIsDealerTurn(false);
       window.location.reload();
     } catch (error) {
       console.error("리셋 실패:", error);
@@ -138,13 +147,13 @@ function App() {
     <div className="poker-app">
       <div className="status-bar">
         <div className="money-item dealer">
-          Dealer: <span>${gameData?.dealer_money ?? 2000}</span>
+          Dealer <span>${gameData?.dealer_money ?? 2000}</span>
         </div>
         <div className="money-item pot">
-          Pot: <span className="pot-text">${gameData?.pot ?? 0}</span>
+          Pot <span className="pot-text">${gameData?.pot ?? 0}</span>
         </div>
         <div className="money-item player">
-          You: <span>${gameData?.player_money ?? 2000}</span>
+          You <span>${gameData?.player_money ?? 2000}</span>
         </div>
       </div>
 
@@ -156,11 +165,12 @@ function App() {
           className={`section dealer-section ${phase === "showdown" && gameData?.winner === "dealer" ? "winner-border" : ""}`}
         >
           <h2>Dealer Hand</h2>
-
-          {/* 말풍선을 왼쪽으로 빼기 위한 래퍼 추가 */}
           <div className="card-area-wrapper">
-            {/* 왼쪽 메시지 공간 */}
-            <div className="dealer-action-aside">
+            {/* 왼쪽 사이드: 딜러 버튼 및 말풍선 */}
+            <div className="dealer-action-aside left-aside">
+              {gameData?.dealer_button === "dealer" && (
+                <span className="d-button-puck">D</span>
+              )}
               {dealerMsg && phase !== "showdown" && (
                 <div
                   className={`dealer-bubble-side ${dealerMsg.toLowerCase()}`}
@@ -170,7 +180,6 @@ function App() {
               )}
             </div>
 
-            {/* 중앙 카드 로우 */}
             <div className="card-row">
               {phase === "showdown" && gameData?.dealer_hand ? (
                 gameData.dealer_hand.map((card, i) =>
@@ -189,11 +198,9 @@ function App() {
                 </>
               )}
             </div>
-
-            {/* 대칭을 위한 오른쪽 빈 공간 */}
+            {/* 우측 사이드: 대칭을 위한 빈 공간 */}
             <div className="dealer-action-aside"></div>
           </div>
-
           <div className="dealer-status-container">
             <div
               className={`hand-name ${phase === "showdown" ? "active" : ""}`}
@@ -226,21 +233,32 @@ function App() {
 
         <div className="divider"></div>
 
+        {/* 플레이어 섹션 */}
         <div
           className={`section player-section ${phase === "showdown" && gameData?.winner === "player" ? "winner-border" : ""}`}
         >
           <h2>Your Hand</h2>
-          <div className="card-row">
-            {gameData?.player_hand?.map((card, i) =>
-              renderCard(
-                card,
-                i,
-                false,
-                phase === "showdown" &&
-                  gameData.winner === "player" &&
-                  isCardInBestHand(card, gameData.player_best_cards),
-              ),
-            )}
+          <div className="card-area-wrapper">
+            {/* 왼쪽 사이드: 딜러 버튼 위치 */}
+            <div className="dealer-action-aside left-aside">
+              {gameData?.dealer_button === "player" && (
+                <span className="d-button-puck">D</span>
+              )}
+            </div>
+
+            <div className="card-row">
+              {gameData?.player_hand?.map((card, i) =>
+                renderCard(
+                  card,
+                  i,
+                  false,
+                  phase === "showdown" &&
+                    gameData.winner === "player" &&
+                    isCardInBestHand(card, gameData.player_best_cards),
+                ),
+              )}
+            </div>
+            <div className="dealer-action-aside"></div>
           </div>
           <div className={`hand-name ${phase === "showdown" ? "active" : ""}`}>
             {gameData?.player_best}
@@ -259,71 +277,78 @@ function App() {
           </button>
         ) : (
           <div className="action-area">
-            {isBetting ? (
-              <div className="bet-toggle-container">
-                <div className="bet-slider-box">
-                  <div className="bet-label-mini">
-                    Raise: <span>${betAmount}</span>
+            <div
+              className={`action-container ${isDealerTurn ? "disabled-ui" : ""}`}
+            >
+              {isBetting ? (
+                <div className="bet-toggle-container">
+                  <div className="bet-slider-box">
+                    <div className="bet-label-mini">
+                      Raise: <span>${betAmount}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="10"
+                      max={Math.min(
+                        gameData?.player_money || 2000,
+                        gameData?.dealer_money || 2000,
+                      )}
+                      step="10"
+                      value={betAmount}
+                      onChange={(e) => setBetAmount(parseInt(e.target.value))}
+                      disabled={isDealerTurn}
+                    />
                   </div>
-                  <input
-                    type="range"
-                    min="10"
-                    max={Math.min(
-                      gameData?.player_money || 2000,
-                      gameData?.dealer_money || 2000,
-                    )}
-                    step="10"
-                    value={betAmount}
-                    onChange={(e) => setBetAmount(parseInt(e.target.value))}
-                  />
+                  <div className="bet-toggle-btns">
+                    <button
+                      className="btn btn-confirm"
+                      onClick={() => handlePlayerAction("raise")}
+                      disabled={isDealerTurn}
+                    >
+                      확정
+                    </button>
+                    <button
+                      className="btn btn-cancel"
+                      onClick={() => setIsBetting(false)}
+                      disabled={isDealerTurn}
+                    >
+                      취소
+                    </button>
+                  </div>
                 </div>
-                <div className="bet-toggle-btns">
+              ) : (
+                <div className="action-group horizontal">
                   <button
-                    className="btn btn-confirm"
-                    onClick={() => handlePlayerAction("raise")}
+                    className="btn btn-fold"
+                    onClick={handleFold}
+                    disabled={loading || isDealerTurn}
                   >
-                    확정
+                    Fold
                   </button>
                   <button
-                    className="btn btn-cancel"
-                    onClick={() => setIsBetting(false)}
+                    className="btn btn-check"
+                    onClick={() => handlePlayerAction("check")}
+                    disabled={loading || isDealerTurn}
                   >
-                    취소
+                    Check
+                  </button>
+                  <button
+                    className="btn btn-call"
+                    onClick={() => handlePlayerAction("call")}
+                    disabled={loading || isDealerTurn}
+                  >
+                    Call
+                  </button>
+                  <button
+                    className="btn btn-raise"
+                    onClick={() => setIsBetting(true)}
+                    disabled={loading || isDealerTurn}
+                  >
+                    Raise
                   </button>
                 </div>
-              </div>
-            ) : (
-              <div className="action-group horizontal">
-                <button
-                  className="btn btn-fold"
-                  onClick={handleFold}
-                  disabled={loading}
-                >
-                  Fold
-                </button>
-                <button
-                  className="btn btn-check"
-                  onClick={() => handlePlayerAction("check")}
-                  disabled={loading}
-                >
-                  Check
-                </button>
-                <button
-                  className="btn btn-call"
-                  onClick={() => handlePlayerAction("call")}
-                  disabled={loading}
-                >
-                  Call
-                </button>
-                <button
-                  className="btn btn-raise"
-                  onClick={() => setIsBetting(true)}
-                  disabled={loading}
-                >
-                  Raise
-                </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>
