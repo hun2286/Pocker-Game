@@ -15,8 +15,8 @@ function App() {
   const [isBetting, setIsBetting] = useState(false);
   const [dealerMsg, setDealerMsg] = useState("");
   const [isDealerTurn, setIsDealerTurn] = useState(false);
+  const [isFolding, setIsFolding] = useState(false); // [추가] 폴드 애니메이션 상태
 
-  // 이번 페이즈에서 유저가 더 내야 할 금액(Call 금액) 계산
   const callAmount =
     (gameData?.current_bet || 0) - (gameData?.player_phase_bet || 0);
 
@@ -64,6 +64,7 @@ function App() {
   const handleStartGame = async () => {
     setLoading(true);
     setDealerMsg("");
+    setIsFolding(false); // 리셋
     try {
       const response = await api.get("/start");
       if (response.data.error) {
@@ -78,11 +79,9 @@ function App() {
         if (response.data.dealer_button === "player") {
           setIsDealerTurn(true);
           setDealerMsg("Thinking...");
-
           setTimeout(() => {
-            if (response.data.dealer_action) {
+            if (response.data.dealer_action)
               setDealerMsg(response.data.dealer_action);
-            }
             setGameData((prev) => ({ ...prev, ...response.data }));
             setIsDealerTurn(false);
             setLoading(false);
@@ -100,10 +99,7 @@ function App() {
 
   const handlePlayerAction = async (actionType) => {
     if (isDealerTurn) return;
-
-    // [수정 포인트] 확정 버튼을 누르자마자 베팅 UI를 즉시 닫습니다.
     setIsBetting(false);
-
     setLoading(true);
     setDealerMsg("Thinking...");
     setIsDealerTurn(true);
@@ -119,7 +115,6 @@ function App() {
         setLoading(false);
       } else {
         setTimeout(() => {
-          // 기존 카드 데이터를 유지하며 돈/베팅 정보만 먼저 업데이트
           setGameData((prev) => ({
             ...prev,
             player_money: response.data.player_money,
@@ -129,17 +124,15 @@ function App() {
             player_phase_bet: response.data.player_phase_bet,
           }));
 
-          if (response.data.dealer_action) {
+          if (response.data.dealer_action)
             setDealerMsg(response.data.dealer_action);
-          }
 
           if (response.data.phase === "showdown") {
             setTimeout(() => {
               setGameData(response.data);
               setPhase(response.data.phase);
-              if (response.data.is_game_over) {
+              if (response.data.is_game_over)
                 setTimeout(() => setIsGameOver(true), 2500);
-              }
               setLoading(false);
             }, 1000);
           } else {
@@ -160,21 +153,29 @@ function App() {
     }
   };
 
+  // [수정] Fold 시 애니메이션 효과 추가
   const handleFold = async () => {
     if (isDealerTurn) return;
+    setIsFolding(true); // 카드 던지기 애니메이션 시작
     setLoading(true);
     setDealerMsg("");
+
     try {
-      const response = await api.post("/fold");
-      setGameData(response.data);
-      setPhase(response.data.phase);
-      setIsBetting(false);
-      if (response.data.is_game_over) {
-        setTimeout(() => setIsGameOver(true), 2500);
-      }
+      // 애니메이션이 진행될 시간을 줍니다 (0.6초)
+      setTimeout(async () => {
+        const response = await api.post("/fold");
+        setGameData(response.data);
+        setPhase(response.data.phase);
+        setIsBetting(false);
+        setIsFolding(false); // 애니메이션 상태 해제
+        if (response.data.is_game_over) {
+          setTimeout(() => setIsGameOver(true), 1500);
+        }
+        setLoading(false);
+      }, 600);
     } catch (error) {
       console.error("Fold 실패:", error);
-    } finally {
+      setIsFolding(false);
       setLoading(false);
     }
   };
@@ -186,6 +187,7 @@ function App() {
       setPhase("waiting");
       setGameData(null);
       setIsDealerTurn(false);
+      setIsFolding(false);
       window.location.reload();
     } catch (error) {
       console.error("리셋 실패:", error);
@@ -209,6 +211,7 @@ function App() {
       <h1>Texas Hold'em Table</h1>
 
       <div className="game-board">
+        {/* Dealer Section */}
         <div
           className={`section dealer-section ${phase === "showdown" && gameData?.winner === "dealer" ? "winner-border" : ""}`}
         >
@@ -244,7 +247,6 @@ function App() {
                 </>
               )}
             </div>
-            <div className="dealer-action-aside"></div>
           </div>
           <div className="dealer-status-container">
             <div
@@ -257,6 +259,7 @@ function App() {
 
         <div className="divider"></div>
 
+        {/* Community Cards Section */}
         <div className="section community-section">
           <div className="card-row">
             {gameData?.community_cards?.map((card, i) => {
@@ -278,6 +281,7 @@ function App() {
 
         <div className="divider"></div>
 
+        {/* Player Section */}
         <div
           className={`section player-section ${phase === "showdown" && gameData?.winner === "player" ? "winner-border" : ""}`}
         >
@@ -288,7 +292,8 @@ function App() {
                 <span className="d-button-puck">D</span>
               )}
             </div>
-            <div className="card-row">
+            {/* [수정] folding-animation 클래스 조건부 추가 */}
+            <div className={`card-row ${isFolding ? "folding-animation" : ""}`}>
               {gameData?.player_hand?.map((card, i) =>
                 renderCard(
                   card,
@@ -300,13 +305,19 @@ function App() {
                 ),
               )}
             </div>
-            <div className="dealer-action-aside"></div>
           </div>
           <div className={`hand-name ${phase === "showdown" ? "active" : ""}`}>
             {gameData?.player_best}
           </div>
         </div>
       </div>
+
+      {/* Fold Overlay Effect */}
+      {isFolding && (
+        <div className="fold-overlay">
+          <h2 className="fold-text">FOLD</h2>
+        </div>
+      )}
 
       <div className="controls">
         {phase === "waiting" || phase === "showdown" ? (
