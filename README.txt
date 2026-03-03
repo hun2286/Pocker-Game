@@ -33,8 +33,8 @@ FastAPI와 React 기반의 전략적 텍사스 홀덤 게임입니다.
 ■ 📂 프로젝트 구조
 
   📂 frontend/ : React 기반 UI 및 프론트엔드 비동기 연출 상태 관리
-  📂 backend/  : FastAPI 기반 API 서버 환경 설정 (main.py)
-  📂 modules/  : 게임 핵심 엔진 및 비즈니스 로직 모듈
+  📂 backend/main.py  : FastAPI 기반 API 서버 환경 설정
+  📂 backend/modules/  : 게임 핵심 엔진 및 비즈니스 로직 모듈
     - game_service.py : [핵심] 턴 제어, 페이즈 전환 및 게임 흐름 관리
     - cards.py        : 덱 생성, 셔플 및 카드 분배 로직
     - evaluator.py    : 족보 분석 및 랭킹 계산
