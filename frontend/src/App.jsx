@@ -130,7 +130,7 @@ function App() {
           if (response.data.dealer_action) {
             setDealerMsg(response.data.dealer_action);
 
-            // [추가] 딜러의 액션(CALL, CHECK 등)을 보여준 후 1.5초 뒤 삭제
+            // [추가] 딜러의 액션(CALL, CHECK 등)을 보여준 후 2초 뒤 삭제
             setTimeout(() => setDealerMsg(""), 2000);
           }
           if (response.data.phase === "showdown") {
