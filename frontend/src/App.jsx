@@ -78,10 +78,13 @@ function App() {
 
         if (response.data.dealer_button === "player") {
           setIsDealerTurn(true);
-          setDealerMsg("Thinking...");
+          // setDealerMsg("Thinking...");
           setTimeout(() => {
-            if (response.data.dealer_action)
+            if (response.data.dealer_action) {
               setDealerMsg(response.data.dealer_action);
+              // [추가] 1.5초 뒤에 말풍선 사라지게 함
+              setTimeout(() => setDealerMsg(""), 1500);
+            }
             setGameData((prev) => ({ ...prev, ...response.data }));
             setIsDealerTurn(false);
             setLoading(false);
@@ -101,7 +104,7 @@ function App() {
     if (isDealerTurn) return;
     setIsBetting(false);
     setLoading(true);
-    setDealerMsg("Thinking...");
+    // setDealerMsg("Thinking...");
     setIsDealerTurn(true);
 
     try {
@@ -124,9 +127,12 @@ function App() {
             player_phase_bet: response.data.player_phase_bet,
           }));
 
-          if (response.data.dealer_action)
+          if (response.data.dealer_action) {
             setDealerMsg(response.data.dealer_action);
 
+            // [추가] 딜러의 액션(CALL, CHECK 등)을 보여준 후 1.5초 뒤 삭제
+            setTimeout(() => setDealerMsg(""), 2000);
+          }
           if (response.data.phase === "showdown") {
             setTimeout(() => {
               setGameData(response.data);
