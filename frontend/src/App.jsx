@@ -121,6 +121,9 @@ function App() {
         return;
       }
 
+      // raise 창 즉시 닫기
+      setIsBetting(false);
+
       // 1. 유저 칩 나가는 시간 (600ms)
       await sleep(600);
       setGameData((prev) => ({
