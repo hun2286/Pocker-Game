@@ -18,9 +18,11 @@ function App() {
   const [dealerMsg, setDealerMsg] = useState("");
   const [isDealerTurn, setIsDealerTurn] = useState(false);
   const [isFolding, setIsFolding] = useState(false);
+  const [isShowdownPending, setIsShowdownPending] = useState(false);
 
-  const callAmount =
-    (gameData?.current_bet || 0) - (gameData?.player_phase_bet || 0);
+  const callAmount = isDealerTurn
+    ? 0
+    : (gameData?.current_bet || 0) - (gameData?.player_phase_bet || 0);
 
   useEffect(() => {
     const initGame = async () => {
@@ -62,21 +64,27 @@ function App() {
   };
 
   const handleStartGame = async () => {
+    console.log("[START] 게임 시작");
     setLoading(true);
     setDealerMsg("");
     setIsFolding(false);
+    setIsShowdownPending(false);
+    setIsGameOver(false);
     try {
       const res = await api.get("/start");
       setGameData(res.data);
       setPhase(res.data.phase);
       setBetAmount(50);
       setIsBetting(false);
+
       if (res.data.dealer_button === "player") {
+        console.log("[TURN] 딜러 선공 결정");
         setIsDealerTurn(true);
-        await sleep(1500);
+        await sleep(1000);
         if (res.data.dealer_action) {
           setDealerMsg(res.data.dealer_action);
-          setTimeout(() => setDealerMsg(""), 1500);
+          await sleep(1500);
+          setDealerMsg("");
         }
       }
     } catch (e) {
@@ -88,14 +96,16 @@ function App() {
   };
 
   const handlePlayerAction = async (actionType) => {
-    if (isDealerTurn) return;
+    if (isDealerTurn && actionType !== "auto") return;
+
     setDealerMsg("");
     setLoading(true);
     setIsDealerTurn(true);
+    setIsBetting(false);
 
     try {
       const response = await api.get(
-        `/next?action=${actionType}&bet=${betAmount}`,
+        `/next?action=${actionType === "auto" ? "check" : actionType}&bet=${betAmount}`,
       );
       const newData = response.data;
 
@@ -106,61 +116,129 @@ function App() {
         return;
       }
 
-      setIsBetting(false);
-
-      // 1. [연출] 내 칩이 나가는 시간 (0.6초)
-      await sleep(600);
-      setGameData((prev) => ({
-        ...prev,
-        player_money: newData.player_money,
-        pot: newData.pot,
-        player_phase_bet: newData.player_phase_bet,
-        current_bet: newData.current_bet,
-      }));
-
+      const isShowdown = newData.phase === "showdown";
       const isPhaseChanged = newData.phase !== phase;
 
-      if (isPhaseChanged) {
-        // [순서 교정 핵심] 유저 Raise -> 딜러 CALL -> 카드 오픈 순서 강제
-
-        // 2. [연출] 딜러가 고민하는 척 (1초)
-        await sleep(1000);
-
-        // 3. [연출] 딜러 메시지 노출 (CALL -> CHECK 등)
-        if (newData.dealer_action) {
-          setDealerMsg(newData.dealer_action);
-        }
-
-        // 4. [중요] 카드는 깔지 않고 '딜러의 돈'만 깎인 상태를 먼저 보여줌
-        // newData 전체를 넣지 않고 필요한 필드만 골라서 업데이트함 (페이즈 변경 방지)
+      // 1. 유저 액션 연출 (시간 단축: 600ms -> 400ms)
+      if (actionType !== "auto") {
+        await sleep(400);
         setGameData((prev) => ({
           ...prev,
-          dealer_money: newData.dealer_money,
-          pot: newData.pot,
-          dealer_phase_bet: newData.dealer_phase_bet,
+          player_money: isShowdown ? prev.player_money : newData.player_money,
+          player_phase_bet: newData.player_phase_bet,
+          current_bet: newData.current_bet,
         }));
-
-        // 5. [연출] 딜러가 콜을 완료한 상태를 유저가 인지하도록 충분히 대기 (1.2초)
-        // 이 시간 동안은 이전 페이즈 화면이 유지됩니다.
-        await sleep(1200);
-
-        // 6. [마무리] 이제서야 페이즈를 넘기고 새 카드를 띄움
-        setPhase(newData.phase);
-        setGameData(newData); // 여기서 전체 데이터가 동기화되며 카드 3장이 나타남
-
-        // 7. 메시지는 카드가 깔린 후에도 조금 더 보여준 뒤 삭제
-        setTimeout(() => setDealerMsg(""), 2000);
-      } else {
-        // 페이즈가 바뀌지 않는 일반적인 상황 (딜러의 반격 등)
-        await sleep(1000);
-        if (newData.dealer_action) setDealerMsg(newData.dealer_action);
-        await sleep(500);
-        setGameData(newData);
-        setTimeout(() => setDealerMsg(""), 2000);
       }
+
+      if (isPhaseChanged) {
+        if (isShowdown) {
+          // --- 쇼다운 연출 (긴장감 유지하되 소폭 단축) ---
+          setIsShowdownPending(true);
+          await sleep(400);
+          if (newData.dealer_action) setDealerMsg(newData.dealer_action);
+          setGameData((prev) => ({
+            ...prev,
+            dealer_money: newData.dealer_money,
+            pot: newData.pot,
+          }));
+          await sleep(600);
+          setPhase("showdown");
+          await sleep(1200);
+          setGameData({ ...newData, pot: 0 });
+          setIsShowdownPending(false);
+          setLoading(false);
+          if (
+            newData.is_game_over ||
+            newData.dealer_money <= 0 ||
+            newData.player_money <= 0
+          ) {
+            setTimeout(() => setIsGameOver(true), 1000);
+          }
+          return;
+        } else {
+          // --- 일반 페이즈 전환 (타이밍 대폭 최적화) ---
+          let firstMsg = "";
+          let secondMsg = "";
+          if (newData.dealer_action && newData.dealer_action.includes(" -> ")) {
+            const parts = newData.dealer_action.split(" -> ");
+            firstMsg = parts[0];
+            secondMsg = parts[1];
+          } else {
+            newData.dealer_button === "player"
+              ? (secondMsg = newData.dealer_action)
+              : (firstMsg = newData.dealer_action);
+          }
+
+          // 딜러 CALL 대응 (800ms -> 500ms)
+          if (firstMsg && firstMsg.includes("CALL")) {
+            setDealerMsg(firstMsg);
+            await sleep(500);
+          }
+
+          // 칩 정산 및 카드 깔기 (600ms -> 400ms)
+          setGameData((prev) => ({
+            ...prev,
+            dealer_money: newData.dealer_money,
+            pot: newData.pot,
+          }));
+          await sleep(400);
+          setPhase(newData.phase);
+          setGameData(newData);
+
+          // 카드 깔리는 애니메이션 확인 시간 (1200ms -> 800ms)
+          await sleep(800);
+
+          if (newData.player_money === 0 || newData.dealer_money === 0) {
+            return handlePlayerAction("auto");
+          }
+
+          const isDealerFirst = newData.dealer_button === "player";
+          if (isDealerFirst && secondMsg) {
+            setDealerMsg(secondMsg);
+            // 레이즈 시 칩 이동 연출 (600ms -> 400ms)
+            if (secondMsg.includes("RAISE")) {
+              setGameData((prev) => ({
+                ...prev,
+                pot: newData.pot,
+                dealer_money: newData.dealer_money,
+                current_bet: newData.current_bet,
+                dealer_phase_bet: newData.dealer_phase_bet,
+              }));
+              await sleep(400);
+            }
+            // 메시지 가독 시간 (1500ms -> 1000ms)
+            await sleep(1000);
+          } else {
+            // 유저 선공 시 불필요한 대기 제거
+            await sleep(200);
+          }
+        }
+      } else {
+        // --- 동일 페이즈 내 공방 (1000ms -> 600ms) ---
+        await sleep(600);
+        if (newData.dealer_action) {
+          setDealerMsg(newData.dealer_action);
+          if (newData.dealer_action.includes("RAISE")) {
+            setGameData((prev) => ({
+              ...prev,
+              pot: newData.pot,
+              dealer_money: newData.dealer_money,
+              current_bet: newData.current_bet,
+              dealer_phase_bet: newData.dealer_phase_bet,
+            }));
+            await sleep(500);
+          }
+        }
+        setGameData(newData);
+        await sleep(600);
+      }
+
+      // 최종 활성화
+      setIsDealerTurn(false);
+      setLoading(false);
+      setTimeout(() => setDealerMsg(""), 1500); // 메시지 삭제 시간도 단축
     } catch (e) {
-      console.error("오류:", e);
-    } finally {
+      console.error("[ERROR] ", e);
       setIsDealerTurn(false);
       setLoading(false);
     }
@@ -254,7 +332,9 @@ function App() {
             </div>
           </div>
         </div>
+
         <div className="divider"></div>
+
         <div className="section community-section">
           <div className="card-row">
             {gameData?.community_cards?.map((card, i) => {
@@ -273,7 +353,9 @@ function App() {
             })}
           </div>
         </div>
+
         <div className="divider"></div>
+
         <div
           className={`section player-section ${phase === "showdown" && gameData?.winner === "player" ? "winner-border" : ""}`}
         >
@@ -302,8 +384,11 @@ function App() {
           </div>
         </div>
       </div>
+
       <div className="controls">
-        {phase === "waiting" || phase === "showdown" ? (
+        {!isGameOver &&
+        (phase === "waiting" ||
+          (phase === "showdown" && !isShowdownPending)) ? (
           <button
             className="btn btn-start luxury"
             onClick={handleStartGame}
@@ -312,79 +397,83 @@ function App() {
             {phase === "showdown" ? "Next Game ($-50)" : "Start Game ($-50)"}
           </button>
         ) : (
-          <div className="action-area">
-            <div
-              className={`action-container ${isDealerTurn ? "disabled-ui" : ""}`}
-            >
-              {isBetting ? (
-                <div className="bet-toggle-container">
-                  <div className="bet-slider-box">
-                    <div className="bet-label-mini">
-                      Raise: <span>${betAmount}</span>
+          !isGameOver &&
+          !isShowdownPending && (
+            <div className="action-area">
+              <div
+                className={`action-container ${isDealerTurn ? "disabled-ui" : ""}`}
+              >
+                {isBetting ? (
+                  <div className="bet-toggle-container">
+                    <div className="bet-slider-box">
+                      <div className="bet-label-mini">
+                        Raise: <span>${betAmount}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="50"
+                        max={Math.min(
+                          gameData?.player_money || 0,
+                          gameData?.dealer_money || 0,
+                        )}
+                        step="10"
+                        value={betAmount}
+                        onChange={(e) => setBetAmount(parseInt(e.target.value))}
+                      />
                     </div>
-                    <input
-                      type="range"
-                      min="50"
-                      max={Math.min(
-                        gameData?.player_money || 2000,
-                        gameData?.dealer_money || 2000,
-                      )}
-                      step="10"
-                      value={betAmount}
-                      onChange={(e) => setBetAmount(parseInt(e.target.value))}
-                    />
+                    <div className="bet-toggle-btns">
+                      <button
+                        className="btn btn-confirm"
+                        onClick={() => handlePlayerAction("raise")}
+                      >
+                        확정
+                      </button>
+                      <button
+                        className="btn btn-cancel"
+                        onClick={() => setIsBetting(false)}
+                      >
+                        취소
+                      </button>
+                    </div>
                   </div>
-                  <div className="bet-toggle-btns">
+                ) : (
+                  <div className="action-group horizontal">
                     <button
-                      className="btn btn-confirm"
-                      onClick={() => handlePlayerAction("raise")}
+                      className="btn btn-fold"
+                      onClick={handleFold}
+                      disabled={loading}
                     >
-                      확정
+                      Fold
                     </button>
                     <button
-                      className="btn btn-cancel"
-                      onClick={() => setIsBetting(false)}
+                      className="btn btn-check"
+                      onClick={() => handlePlayerAction("check")}
+                      disabled={loading || callAmount > 0}
                     >
-                      취소
+                      Check
+                    </button>
+                    <button
+                      className="btn btn-call"
+                      onClick={() => handlePlayerAction("call")}
+                      disabled={loading || callAmount <= 0}
+                    >
+                      Call {callAmount > 0 ? `($${callAmount})` : ""}
+                    </button>
+                    <button
+                      className="btn btn-raise"
+                      onClick={() => setIsBetting(true)}
+                      disabled={loading}
+                    >
+                      Raise
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div className="action-group horizontal">
-                  <button
-                    className="btn btn-fold"
-                    onClick={handleFold}
-                    disabled={loading}
-                  >
-                    Fold
-                  </button>
-                  <button
-                    className="btn btn-check"
-                    onClick={() => handlePlayerAction("check")}
-                    disabled={loading || callAmount > 0}
-                  >
-                    Check
-                  </button>
-                  <button
-                    className="btn btn-call"
-                    onClick={() => handlePlayerAction("call")}
-                    disabled={loading || callAmount <= 0}
-                  >
-                    Call {callAmount > 0 ? `($${callAmount})` : ""}
-                  </button>
-                  <button
-                    className="btn btn-raise"
-                    onClick={() => setIsBetting(true)}
-                    disabled={loading}
-                  >
-                    Raise
-                  </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )
         )}
       </div>
+
       {isGameOver && (
         <div className="game-over-overlay">
           <div className="game-over-content">
