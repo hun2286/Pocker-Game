@@ -1,0 +1,21 @@
+# 의존성 패키지 (가장 중요)
+node_modules
+npm-debug.log
+
+# 빌드 결과물 (이미 빌드된 파일이 있으면 충돌 방지)
+dist
+build
+
+# 로컬 환경 설정 파일
+.env
+.env.local
+
+# OS 관련 불필요 파일
+.DS_Store
+Thumbs.db
+
+# 기타 도커 관련 파일
+Dockerfile
+.dockerignore
+.git
+.gitignore
