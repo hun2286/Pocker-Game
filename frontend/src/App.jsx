@@ -2,10 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import "./App.css";
 
-const api = axios.create({
-  baseURL: "http://localhost:8000",
-});
-
+const api = axios.create({ baseURL: "http://localhost:8000" });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function App() {
@@ -64,28 +61,28 @@ function App() {
   };
 
   const handleStartGame = async () => {
-    console.log("[START] 게임 시작");
     setLoading(true);
     setDealerMsg("");
-    setIsFolding(false);
-    setIsShowdownPending(false);
-    setIsGameOver(false);
+    setIsDealerTurn(true);
     try {
       const res = await api.get("/start");
-      setGameData(res.data);
-      setPhase(res.data.phase);
-      setBetAmount(50);
-      setIsBetting(false);
+      const startData = res.data;
+      console.log(`%c[SYSTEM] 게임 시작`, "color: #f1c40f; font-weight: bold;");
 
-      if (res.data.dealer_button === "player") {
-        console.log("[TURN] 딜러 선공 결정");
-        setIsDealerTurn(true);
-        await sleep(1000);
-        if (res.data.dealer_action) {
-          setDealerMsg(res.data.dealer_action);
-          await sleep(1500);
-          setDealerMsg("");
-        }
+      setPhase(startData.phase);
+      setGameData(startData);
+      await sleep(1500);
+
+      if (startData.dealer_button === "player") {
+        setDealerMsg("...");
+        await sleep(800);
+        const action = startData.dealer_action || "CHECK";
+        console.log(
+          `%c[DEALER] 선공: ${action}`,
+          "color: #ff7675; font-weight: bold;",
+        );
+        setDealerMsg(action);
+        if (action === "RAISE") setGameData(startData);
       }
     } catch (e) {
       console.error(e);
@@ -97,6 +94,10 @@ function App() {
 
   const handlePlayerAction = async (actionType) => {
     if (isDealerTurn && actionType !== "auto") return;
+    console.log(
+      `%c[USER] 선택: ${actionType.toUpperCase()}`,
+      "color: #55efc4; font-weight: bold;",
+    );
 
     setDealerMsg("");
     setLoading(true);
@@ -109,138 +110,89 @@ function App() {
       );
       const newData = response.data;
 
-      if (newData.error) {
-        alert(newData.error);
-        setIsDealerTurn(false);
-        setLoading(false);
+      if (newData.dealer_action === "FOLD") {
+        console.log(
+          "%c[DEALER] FOLD (유저 승리!)",
+          "color: white; background: #c0392b; padding: 2px 5px;",
+        );
+        setDealerMsg("FOLD");
+        await sleep(1000);
+        setGameData(newData);
+        setPhase("waiting");
         return;
       }
 
       const isShowdown = newData.phase === "showdown";
       const isPhaseChanged = newData.phase !== phase;
 
-      // 1. 유저 액션 연출 (시간 단축: 600ms -> 400ms)
-      if (actionType !== "auto") {
-        await sleep(400);
-        setGameData((prev) => ({
-          ...prev,
-          player_money: isShowdown ? prev.player_money : newData.player_money,
-          player_phase_bet: newData.player_phase_bet,
-          current_bet: newData.current_bet,
-        }));
-      }
+      await sleep(400);
+      setGameData((prev) => ({
+        ...prev,
+        player_money: isShowdown ? prev.player_money : newData.player_money,
+        current_bet: newData.current_bet,
+      }));
 
       if (isPhaseChanged) {
+        console.log(
+          `%c[SYSTEM] 페이즈 전환: ${phase.toUpperCase()} -> ${newData.phase.toUpperCase()}`,
+          "color: #f1c40f;",
+        );
         if (isShowdown) {
-          // --- 쇼다운 연출 (긴장감 유지하되 소폭 단축) ---
           setIsShowdownPending(true);
-          await sleep(400);
-          if (newData.dealer_action) setDealerMsg(newData.dealer_action);
-          setGameData((prev) => ({
-            ...prev,
-            dealer_money: newData.dealer_money,
-            pot: newData.pot,
-          }));
           await sleep(600);
           setPhase("showdown");
-          await sleep(1200);
+          await sleep(1500);
           setGameData({ ...newData, pot: 0 });
           setIsShowdownPending(false);
-          setLoading(false);
-          if (
-            newData.is_game_over ||
-            newData.dealer_money <= 0 ||
-            newData.player_money <= 0
-          ) {
-            setTimeout(() => setIsGameOver(true), 1000);
-          }
-          return;
         } else {
-          // --- 일반 페이즈 전환 (타이밍 대폭 최적화) ---
-          let firstMsg = "";
-          let secondMsg = "";
-          if (newData.dealer_action && newData.dealer_action.includes(" -> ")) {
-            const parts = newData.dealer_action.split(" -> ");
-            firstMsg = parts[0];
-            secondMsg = parts[1];
-          } else {
-            newData.dealer_button === "player"
-              ? (secondMsg = newData.dealer_action)
-              : (firstMsg = newData.dealer_action);
-          }
-
-          // 딜러 CALL 대응 (800ms -> 500ms)
-          if (firstMsg && firstMsg.includes("CALL")) {
-            setDealerMsg(firstMsg);
-            await sleep(500);
-          }
-
-          // 칩 정산 및 카드 깔기 (600ms -> 400ms)
-          setGameData((prev) => ({
-            ...prev,
-            dealer_money: newData.dealer_money,
-            pot: newData.pot,
-          }));
-          await sleep(400);
-          setPhase(newData.phase);
+          setGameData((prev) => ({ ...prev, pot: newData.pot }));
+          await sleep(600);
           setGameData(newData);
+          setPhase(newData.phase);
+          await sleep(1500); // 카드 딜링 대기
 
-          // 카드 깔리는 애니메이션 확인 시간 (1200ms -> 800ms)
-          await sleep(800);
+          if (newData.dealer_button === "player") {
+            const nextAct =
+              newData.dealer_action && newData.dealer_action.includes(" -> ")
+                ? newData.dealer_action.split(" -> ")[1]
+                : newData.dealer_action || "CHECK";
 
-          if (newData.player_money === 0 || newData.dealer_money === 0) {
-            return handlePlayerAction("auto");
-          }
-
-          const isDealerFirst = newData.dealer_button === "player";
-          if (isDealerFirst && secondMsg) {
-            setDealerMsg(secondMsg);
-            // 레이즈 시 칩 이동 연출 (600ms -> 400ms)
-            if (secondMsg.includes("RAISE")) {
-              setGameData((prev) => ({
-                ...prev,
-                pot: newData.pot,
-                dealer_money: newData.dealer_money,
-                current_bet: newData.current_bet,
-                dealer_phase_bet: newData.dealer_phase_bet,
-              }));
-              await sleep(400);
-            }
-            // 메시지 가독 시간 (1500ms -> 1000ms)
-            await sleep(1000);
-          } else {
-            // 유저 선공 시 불필요한 대기 제거
-            await sleep(200);
+            setDealerMsg("...");
+            await sleep(800);
+            console.log(
+              `%c[DEALER] 선공: ${nextAct}`,
+              "color: #ff7675; font-weight: bold;",
+            );
+            setDealerMsg(nextAct);
+            if (nextAct.includes("RAISE")) setGameData(newData);
           }
         }
       } else {
-        // --- 동일 페이즈 내 공방 (1000ms -> 600ms) ---
+        // --- [동일 페이즈 딜러 대응] 유저 CHECK 시 딜러가 RAISE 하는 경우 등 ---
         await sleep(600);
         if (newData.dealer_action) {
-          setDealerMsg(newData.dealer_action);
-          if (newData.dealer_action.includes("RAISE")) {
-            setGameData((prev) => ({
-              ...prev,
-              pot: newData.pot,
-              dealer_money: newData.dealer_money,
-              current_bet: newData.current_bet,
-              dealer_phase_bet: newData.dealer_phase_bet,
-            }));
-            await sleep(500);
-          }
-        }
-        setGameData(newData);
-        await sleep(600);
-      }
+          // 체이닝된 메시지 중 앞부분만 추출 (예: "RAISE -> CHECK" 인 경우 "RAISE")
+          const responseAction = newData.dealer_action.split(" -> ")[0];
 
-      // 최종 활성화
-      setIsDealerTurn(false);
-      setLoading(false);
-      setTimeout(() => setDealerMsg(""), 1500); // 메시지 삭제 시간도 단축
+          setDealerMsg("...");
+          await sleep(600);
+
+          console.log(
+            `%c[DEALER] 대응: ${responseAction}`,
+            "color: #ff7675; font-weight: bold;",
+          );
+          setDealerMsg(responseAction);
+          setGameData(newData);
+          await sleep(1000);
+        }
+      }
     } catch (e) {
-      console.error("[ERROR] ", e);
+      console.error(e);
+    } finally {
       setIsDealerTurn(false);
       setLoading(false);
+      // 메시지 초기화를 삭제하거나 시간을 넉넉히 주어 가독성 보장
+      setTimeout(() => setDealerMsg(""), 3000);
     }
   };
 
@@ -260,6 +212,7 @@ function App() {
     } catch (e) {
       console.error(e);
     } finally {
+      setIsDealerTurn(false);
       setLoading(false);
     }
   };
@@ -289,7 +242,7 @@ function App() {
       <h1>Texas Hold'em Table</h1>
       <div className="game-board">
         <div
-          className={`section dealer-section ${phase === "showdown" && gameData?.winner === "dealer" ? "winner-border" : ""}`}
+          className={`section dealer-section ${phase === "showdown" && gameData?.winner === "dealer" ? "winner-border" : ""} ${dealerMsg === "FOLD" ? "folding" : ""}`}
         >
           <h2>Dealer Hand</h2>
           <div className="card-area-wrapper">
@@ -299,7 +252,7 @@ function App() {
               )}
               {dealerMsg && phase !== "showdown" && (
                 <div
-                  className={`dealer-bubble-side ${dealerMsg.toLowerCase()}`}
+                  className={`dealer-bubble-side ${dealerMsg.toLowerCase().replace(/\s/g, "-")}`}
                 >
                   {dealerMsg}
                 </div>
@@ -332,9 +285,7 @@ function App() {
             </div>
           </div>
         </div>
-
         <div className="divider"></div>
-
         <div className="section community-section">
           <div className="card-row">
             {gameData?.community_cards?.map((card, i) => {
@@ -353,9 +304,7 @@ function App() {
             })}
           </div>
         </div>
-
         <div className="divider"></div>
-
         <div
           className={`section player-section ${phase === "showdown" && gameData?.winner === "player" ? "winner-border" : ""}`}
         >
@@ -384,7 +333,6 @@ function App() {
           </div>
         </div>
       </div>
-
       <div className="controls">
         {!isGameOver &&
         (phase === "waiting" ||
@@ -437,7 +385,7 @@ function App() {
                     </div>
                   </div>
                 ) : (
-                  <div className="action-group horizontal">
+                  <div className="horizontal action-group">
                     <button
                       className="btn btn-fold"
                       onClick={handleFold}
@@ -473,7 +421,6 @@ function App() {
           )
         )}
       </div>
-
       {isGameOver && (
         <div className="game-over-overlay">
           <div className="game-over-content">
