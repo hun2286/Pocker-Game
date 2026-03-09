@@ -112,18 +112,25 @@ def start_game_logic():
 
 
 def next_phase_logic(action, bet):
-    """플레이어 액션에 따른 게임 진행 및 페이즈 전환"""
+    """플레이어 액션에 따른 게임 진행 및 페이즈 전환 로직 보정"""
     curr_phase = game_state["phase"]
     deck = game_state["deck"]
 
-    # 1. 플레이어 베팅 정산
+    # 1. 플레이어 베팅 처리
     p_needed = game_state["current_bet"] - game_state["player_phase_bet"]
-    actual_p_bet = (
-        p_needed if action == "call" else (p_needed + bet if action == "raise" else 0)
-    )
+    actual_p_bet = 0
 
-    if action == "raise":
+    if action == "call":
+        actual_p_bet = p_needed
+    elif action == "raise":
+        actual_p_bet = p_needed + bet
         game_state["current_bet"] += bet
+    elif action == "check":
+        if p_needed > 0:
+            return {
+                "error": "베팅 금액이 있어 체크할 수 없습니다. 콜이나 폴드를 하세요."
+            }
+        actual_p_bet = 0
 
     if game_state["player_money"] < actual_p_bet:
         return {"error": "자금이 부족합니다!"}
@@ -132,55 +139,63 @@ def next_phase_logic(action, bet):
     game_state["player_phase_bet"] += actual_p_bet
     game_state["pot"] += actual_p_bet
 
-    # 2. 딜러 반응 및 폴드 로직
+    # 2. 딜러 반응 결정 (Action Closing Logic)
     dealer_msg = ""
     should_proceed = False
 
+    # 상황 A: 유저가 CALL함 -> 베팅 금액이 일치해짐 -> 페이즈 종료
     if action == "call":
         dealer_msg = "CALL"
         should_proceed = True
+
+    # 상황 B: 유저가 CHECK함
     elif action == "check":
-        if game_state["dealer_button"] == "player":  # 유저가 버튼이면 딜러가 후공
+        # 유저가 D버튼(dealer_button == "player")을 가졌다면 유저는 '후공'입니다.
+        # 즉, 딜러가 이미 선공으로 액션을 마쳤으므로 유저가 체크하면 즉시 페이즈가 끝나야 합니다.
+        if game_state["dealer_button"] == "player":
             should_proceed = True
-        else:  # 딜러가 버튼이면 유저 체크 시 딜러가 대응
+            dealer_msg = "CHECK"  # 딜러의 이전 액션을 확인하는 용도
+
+        # 유저가 D버튼이 없다면 유저가 '선공'입니다.
+        # 유저가 먼저 체크했으니, 이제 후공인 딜러에게 기회를 줍니다.
+        else:
             dealer_msg = decide_dealer_action(
                 game_state["dealer_hand"] + game_state["community_cards"]
             )
             if dealer_msg == "RAISE":
                 r_amt = 50
                 game_state["dealer_money"] -= r_amt
-                game_state["dealer_phase_bet"] = r_amt
-                game_state["current_bet"] = r_amt
+                game_state["dealer_phase_bet"] += r_amt
+                game_state["current_bet"] += r_amt
                 game_state["pot"] += r_amt
-                should_proceed = False
+                should_proceed = False  # 딜러가 판을 키웠으니 유저가 다시 반응해야 함
             else:
                 dealer_msg = "CHECK"
-                should_proceed = True
+                should_proceed = True  # 둘 다 체크했으니 페이즈 종료
+
+    # 상황 C: 유저가 RAISE함
     elif action == "raise":
         d_res = evaluate_hand(game_state["dealer_hand"] + game_state["community_cards"])
-        score = d_res.get("score", 0)
-
-        # 고도화된 폴드 로직 (딜러가 불리할 때 폴드 확률)
-        if score == 0 and bet >= 100 and random.random() < 0.6:
+        # 폴드 로직
+        if d_res.get("score", 0) == 0 and bet >= 100 and random.random() < 0.6:
             return handle_dealer_fold()
 
-        # 딜러가 따라갈 경우
+        # 딜러는 일단 따라가는(CALL) 것으로 처리 (더 고도화하면 여기서 딜러가 리레이즈 가능)
         d_needed = game_state["current_bet"] - game_state["dealer_phase_bet"]
         actual_d_call = min(d_needed, game_state["dealer_money"])
         game_state["dealer_money"] -= actual_d_call
         game_state["dealer_phase_bet"] += actual_d_call
         game_state["pot"] += actual_d_call
         dealer_msg = "CALL"
-        should_proceed = True
+        should_proceed = True  # 유저 레이즈에 딜러가 콜했으니 금액이 같아져서 종료
 
-    # 3. 페이즈 전환 로직
+    # 3. 페이즈 전환 (금액이 일치할 때만 실행)
     if should_proceed:
         if curr_phase == "river":
             return finish_and_showdown(dealer_msg)
 
         reset_phase_bets()
 
-        # 커뮤니티 카드 오픈
         if curr_phase == "pre-flop":
             game_state["community_cards"] += [deck.pop() for _ in range(3)]
             game_state["phase"] = "flop"
@@ -188,7 +203,7 @@ def next_phase_logic(action, bet):
             game_state["community_cards"].append(deck.pop())
             game_state["phase"] = "turn" if curr_phase == "flop" else "river"
 
-        # 다음 페이즈 선공 결정 (딜러가 선공일 경우)
+        # 다음 페이즈 선공 결정 (딜러 버튼 위치에 따라)
         if game_state["dealer_button"] == "player":
             next_action = decide_dealer_action(
                 game_state["dealer_hand"] + game_state["community_cards"]
@@ -201,7 +216,6 @@ def next_phase_logic(action, bet):
                 game_state["pot"] += r_amt
             else:
                 next_action = "CHECK"
-            # 메시지 체이닝 (예: "CALL -> CHECK")
             dealer_msg = f"{dealer_msg} -> {next_action}" if dealer_msg else next_action
 
     p_final_res = evaluate_hand(
