@@ -77,24 +77,34 @@ function App() {
         setDealerMsg("...");
         await sleep(800);
         const action = startData.dealer_action || "CHECK";
+
         console.log(
           `%c[DEALER] 선공: ${action}`,
           "color: #ff7675; font-weight: bold;",
         );
+
         setDealerMsg(action);
         if (action === "RAISE") setGameData(startData);
+
+        // 🔴 [추가] 첫 게임 시작 시에도 선공 메시지를 일정 시간 후 지워줍니다.
+        setTimeout(() => {
+          setDealerMsg("");
+        }, 1500);
       }
     } catch (e) {
       console.error(e);
     } finally {
       setIsDealerTurn(false);
       setLoading(false);
+      // 참고: 여기서 지우는 건 handleStartGame이 끝나는 시점이라
+      // 위의 setTimeout이 훨씬 정확한 타이밍에 작동합니다.
     }
   };
 
   const handlePlayerAction = async (actionType) => {
     if (isDealerTurn && actionType !== "auto") return;
 
+    // [USER] 로그는 항상 최상단
     console.log(
       `%c[USER] 선택: ${actionType.toUpperCase()}`,
       "color: #55efc4; font-weight: bold;",
@@ -111,84 +121,73 @@ function App() {
       );
       const newData = response.data;
 
-      if (newData.dealer_action === "FOLD") {
-        setDealerMsg("FOLD");
-        await sleep(1000);
-        setGameData(newData);
-        setPhase("waiting");
-        return;
-      }
-
-      const isPhaseChanged = newData.phase !== phase;
-      const isShowdown = newData.phase === "showdown";
-
       // 1. 딜러의 즉각 대응 처리
       if (newData.dealer_action) {
         const immediateRes = newData.dealer_action.includes(" -> ")
           ? newData.dealer_action.split(" -> ")[0]
           : newData.dealer_action;
 
-        const shouldSkipMsg =
-          isPhaseChanged && (actionType === "check" || actionType === "call");
+        const isAllIn = newData.player_money <= 0 || newData.dealer_money <= 0;
+        const isClosingAction =
+          actionType === "call" ||
+          (actionType === "check" && newData.dealer_button === "player");
+        const isPhaseChanged = newData.phase !== phase;
 
-        if (!shouldSkipMsg) {
+        // 🟢 [DEALER 대응 로그] - 스킵 조건이 아닐 때만 출력
+        if (!(isPhaseChanged && isClosingAction)) {
           setDealerMsg("...");
           await sleep(600);
-          setDealerMsg(immediateRes);
-          // 🔴 딜러 대응 콘솔 로그 보강
+
+          const msg =
+            isAllIn && immediateRes === "CALL" ? "ALL-IN CALL!" : immediateRes;
+          setDealerMsg(msg);
+
+          // 콘솔 로그 복구
           console.log(
-            `%c[DEALER] 대응: ${immediateRes}`,
+            `%c[DEALER] 대응: ${msg}`,
             "color: #ff7675; font-weight: bold;",
           );
-
-          setGameData((prev) => ({
-            ...prev,
-            dealer_money: newData.dealer_money,
-            pot: newData.pot,
-            current_bet: newData.current_bet,
-            player_money: newData.player_money,
-          }));
-          await sleep(1200);
-        } else {
-          setGameData((prev) => ({
-            ...prev,
-            dealer_money: newData.dealer_money,
-            pot: newData.pot,
-          }));
+          await sleep(1000);
         }
+
+        // 데이터 반영
+        setGameData((prev) => ({
+          ...prev,
+          dealer_money: newData.dealer_money,
+          player_money: newData.player_money,
+          pot: newData.pot,
+          current_bet: newData.current_bet,
+        }));
       }
 
       // 2. 페이즈 전환 시퀀스
+      const isPhaseChanged = newData.phase !== phase;
       if (isPhaseChanged) {
-        // 🔴 페이즈 전환 시스템 로그 추가
         console.log(
           `%c[SYSTEM] 페이즈 전환: ${newData.phase.toUpperCase()}`,
           "color: #f1c40f; font-weight: bold;",
         );
 
-        if (isShowdown) {
+        if (newData.phase === "showdown") {
           setIsShowdownPending(true);
-          await sleep(600);
+          await sleep(500);
           setPhase("showdown");
-          await sleep(1500);
+          await sleep(2000);
           setGameData({ ...newData, pot: 0 });
           setIsShowdownPending(false);
+
+          if (newData.player_money <= 0 || newData.dealer_money <= 0) {
+            setTimeout(() => setIsGameOver(true), 2500);
+          }
+          return; // 쇼다운 시 여기서 종료
         } else {
-          setGameData((prev) => ({ ...prev, pot: newData.pot }));
+          // 일반 페이즈 전환
           await sleep(800);
-
           setPhase(newData.phase);
-          setGameData((prev) => ({
-            ...prev,
-            community_cards: newData.community_cards,
-            phase: newData.phase,
-            current_bet: 0,
-            player_phase_bet: 0,
-            dealer_phase_bet: 0,
-          }));
-          await sleep(1500);
+          setGameData((prev) => ({ ...prev, ...newData })); // 전체 데이터 동기화
+          await sleep(1000);
 
-          // 3. 새 페이즈에서의 딜러 선공 처리
+          // 3. 새 페이즈에서의 선공 알림 로그 복구
           if (newData.dealer_button === "player") {
             const nextAct =
               newData.dealer_action && newData.dealer_action.includes(" -> ")
@@ -196,25 +195,22 @@ function App() {
                 : newData.dealer_action || "CHECK";
 
             setDealerMsg("...");
-            await sleep(1000);
-
-            // 🔴 [핵심] 딜러 선공 콘솔 로그 복구
+            await sleep(800);
+            setDealerMsg(nextAct);
             console.log(
               `%c[DEALER] 선공: ${nextAct}`,
-              "color: #ff7675; font-weight: bold; background: #2d3436; padding: 2px 5px;",
+              "color: #ff7675; font-weight: bold; background: #2d3436;",
             );
-
-            setDealerMsg(nextAct);
             setGameData(newData);
           } else {
-            // 🔴 유저 선공 알림 로그 추가
             console.log(
-              `%c[SYSTEM] 유저 선공 차례입니다 (D버튼: 딜러)`,
+              `%c[SYSTEM] 유저 선공 (D버튼: 딜러)`,
               "color: #55efc4;",
             );
           }
         }
       } else {
+        // 페이즈 변화 없을 때 데이터 업데이트
         setGameData(newData);
       }
     } catch (e) {
@@ -222,7 +218,6 @@ function App() {
     } finally {
       setIsDealerTurn(false);
       setLoading(false);
-      setTimeout(() => setDealerMsg(""), 3000);
     }
   };
 
