@@ -1,3 +1,4 @@
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from modules import game_service
@@ -31,3 +32,7 @@ def fold_game():
 @app.post("/reset")
 def reset_game():
     return game_service.reset_game_logic()
+
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
